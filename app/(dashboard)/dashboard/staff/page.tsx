@@ -657,158 +657,159 @@ export default function StaffPage() {
       )}
 
       {/* Staff/Volunteers Table */}
-      {(activeTab === "staff" || activeTab === "volunteers") && (
+      {(activeTab === "staff" || activeTab === "volunteers") &&
         staff.length > 0 && (
           <Card className="overflow-hidden h-screen">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-background border-b border-border">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    Photo
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    Role
-                  </th>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-background border-b border-border">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Photo
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Role
+                    </th>
 
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    Phone
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    Join Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStaff.map((member) => (
-                  <tr
-                    key={member._id}
-                    className="border-b border-border hover:bg-background/50"
-                  >
-                    <td className="px-6 py-4 text-foreground">
-                      <img
-                        src={member.photo?.url || "/user.avif"}
-                        alt={member.name}
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    </td>
-                    <td className="px-6 py-4 text-foreground">{member.name}</td>
-                    <td className="px-6 py-4 text-foreground/70">
-                      {member.role}
-                    </td>
-
-                    <td className="px-6 py-4 text-foreground/70">
-                      <div className="flex items-center gap-2">
-                        <Mail size={14} />
-                        {member.email}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-foreground/70">
-                      <div className="flex items-center gap-2">
-                        <Phone size={14} />
-                        {member.phone}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-foreground/70">
-                      {member.createdAt
-                        ? new Date(member.createdAt).toLocaleDateString()
-                        : "N/A"}
-                    </td>
-                    <td className="px-6 py-4">
-                      <select
-                        value={member.status}
-                        onChange={(e) =>
-                          handleStatusChange(
-                            member._id,
-                            e.target.value as "active" | "inactive",
-                          )
-                        }
-                        className={`px-2 py-1 rounded text-xs font-medium border-0 cursor-pointer ${
-                          member.status === "active"
-                            ? "bg-accent/10 text-accent"
-                            : "bg-primary/10 text-primary"
-                        }`}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </td>
-                    <td className="px-6 py-4">
-                      {/* 3 dot menu options */}
-                      <div className="flex gap-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                            >
-                              <MoreVertical size={16} />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              className="hover:text-white"
-                              onClick={() => setViewDetailsId(member._id)}
-                            >
-                              <Eye /> View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="hover:text-white"
-                              onClick={() => {
-                                setShowAddForm(true);
-                                setEditData(member);
-                                handleEdit(member);
-                              }}
-                            >
-                              <Edit />
-                              Edit Profile
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="hover:text-white"
-                              onClick={() => setShowAddSocialLink(member._id)}
-                            >
-                              <UserRoundPlus /> Add Social Link
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className={`hover:text-white ${saving ? "items-center justify-center text-red-500" : ""}`}
-                              onClick={() => handleDelete(member._id)}
-                            >
-                              {saving ? (
-                                <>
-                                  Deleting...{" "}
-                                  <Loader className="animate-spin" />
-                                </>
-                              ) : (
-                                <>
-                                  <Trash2 className="text-red-600" /> Delete
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </td>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Phone
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Join Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-        )
-      )}
+                </thead>
+                <tbody>
+                  {filteredStaff.map((member) => (
+                    <tr
+                      key={member._id}
+                      className="border-b border-border hover:bg-background/50"
+                    >
+                      <td className="px-6 py-4 text-foreground">
+                        <img
+                          src={member.photo?.url || "/user.avif"}
+                          alt={member.name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      </td>
+                      <td className="px-6 py-4 text-foreground">
+                        {member.name}
+                      </td>
+                      <td className="px-6 py-4 text-foreground/70">
+                        {member.role}
+                      </td>
+
+                      <td className="px-6 py-4 text-foreground/70">
+                        <div className="flex items-center gap-2">
+                          <Mail size={14} />
+                          {member.email}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-foreground/70">
+                        <div className="flex items-center gap-2">
+                          <Phone size={14} />
+                          {member.phone}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-foreground/70">
+                        {member.createdAt
+                          ? new Date(member.createdAt).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <select
+                          value={member.status}
+                          onChange={(e) =>
+                            handleStatusChange(
+                              member._id,
+                              e.target.value as "active" | "inactive",
+                            )
+                          }
+                          className={`px-2 py-1 rounded text-xs font-medium border-0 cursor-pointer ${
+                            member.status === "active"
+                              ? "bg-accent/10 text-accent"
+                              : "bg-primary/10 text-primary"
+                          }`}
+                        >
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4">
+                        {/* 3 dot menu options */}
+                        <div className="flex gap-2">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                              >
+                                <MoreVertical size={16} />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                className="hover:text-white"
+                                onClick={() => setViewDetailsId(member._id)}
+                              >
+                                <Eye /> View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="hover:text-white"
+                                onClick={() => {
+                                  setShowAddForm(true);
+                                  setEditData(member);
+                                  handleEdit(member);
+                                }}
+                              >
+                                <Edit />
+                                Edit Profile
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="hover:text-white"
+                                onClick={() => setShowAddSocialLink(member._id)}
+                              >
+                                <UserRoundPlus /> Add Social Link
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className={`hover:text-white ${saving ? "items-center justify-center text-red-500" : ""}`}
+                                onClick={() => handleDelete(member._id)}
+                              >
+                                {saving ? (
+                                  <>
+                                    Deleting...{" "}
+                                    <Loader className="animate-spin" />
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="text-red-600" /> Delete
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
 
       {/* Newsletter Subscribers Table */}
       {activeTab === "subscribers" && (
@@ -891,11 +892,14 @@ export default function StaffPage() {
       )}
 
       {/* Empty State */}
-      {((activeTab !== "subscribers" && staff.length===0 && filteredStaff.length === 0) ||
+      {((activeTab !== "subscribers" &&
+        staff.length === 0 &&
+        filteredStaff.length === 0) ||
         (activeTab === "subscribers" && subscribers.length === 0)) && (
         <Card className="p-8 text-center">
-           
-          <span className="flex items-center justify-center"><img src="/no-staff.avif" className="w-60 h-60" alt="" /></span>
+          <span className="flex items-center justify-center">
+            <img src="/no-staff.avif" className="w-60 h-60" alt="" />
+          </span>
           <p className="text-foreground/70">
             {activeTab === "subscribers"
               ? "No subscribers found  "

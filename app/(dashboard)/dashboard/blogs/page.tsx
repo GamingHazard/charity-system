@@ -219,42 +219,39 @@ export default function BlogsPage() {
     setShowViewDialog(true);
   };
 
-  const handleToggleFeatured = async(id: string) => {
+  const handleToggleFeatured = async (id: string) => {
     try {
       const res = await apiRequest("PUT", `/blogs/${id}/toggle-featured`);
       if (res.ok) {
         setBlogs(
-      blogs.map((blog) =>
-        blog._id === id ? { ...blog, featured: !blog.featured } : blog,
-      ),
-    );
+          blogs.map((blog) =>
+            blog._id === id ? { ...blog, featured: !blog.featured } : blog,
+          ),
+        );
       }
-      
-    setOpenMenuId(null);
+
+      setOpenMenuId(null);
     } catch (error) {
       console.log(error);
-      
     }
   };
 
-  const handlePublish = async(id: string) => {
+  const handlePublish = async (id: string) => {
     try {
-     
-     const res = await apiRequest("PUT", `/blogs/publish/blog/${id}`);
+      const res = await apiRequest("PUT", `/blogs/publish/blog/${id}`);
 
-if (res.ok) {
-   setBlogs(
-      blogs.map((blog) =>
-        blog._id === id ? { ...blog, status: "published" } : blog,
-      ),
-    );
-}
-    
-   } catch (error) {
-    console.log(error);
-    
-    
-   }finally{setOpenMenuId(null);}
+      if (res.ok) {
+        setBlogs(
+          blogs.map((blog) =>
+            blog._id === id ? { ...blog, status: "published" } : blog,
+          ),
+        );
+      }
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setOpenMenuId(null);
+    }
   };
 
   const handleAddComment = (blogId: string) => {
@@ -657,8 +654,8 @@ if (res.ok) {
                   By {viewingBlog.author} •{" "}
                   {viewingBlog.createdAt
                     ? new Date(viewingBlog.createdAt).toLocaleDateString()
-                    : "Not provided"} •{" "}
-                  {viewingBlog.category}
+                    : "Not provided"}{" "}
+                  • {viewingBlog.category}
                 </DialogDescription>
               </DialogHeader>
 
@@ -793,165 +790,176 @@ if (res.ok) {
       </Dialog>
       {blogs && filteredBlogs.length > 0 && (
         <Card className="overflow-hidden h-screen">
-        <div className="overflow-x-auto flex-1">
-          <table className="w-full">
-            <thead className="bg-background border-b border-border">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Title
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Author
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Category
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Creation Date
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBlogs.map((blog) => (
-                <tr
-                  key={blog._id}
-                  className="border-b border-border hover:bg-background/50"
-                >
-                  <td className="px-6 py-4 truncate line-clamp-1 text-sm text-foreground">{blog.title}</td>
-                  <td className="px-6 py-4 text-foreground/70">
-                    {blog.author}
-                  </td>
-                  <td className="px-6 py-4 text-foreground/70">
-                    {blog.category}
-                  </td>
-                  <td className="px-6 py-4 text-foreground/70">
-                    {new Date(blog.createdAt || "").toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4">
-                    <Badge
-                      className={`px-3 py-1 rounded text-xs font-medium flex items-center gap-1 ${
-                        blog.status === "published"
-                          ? "bg-accent/10 text-accent"
-                          : "bg-primary/10 text-primary"
-                      }`}
-                    >
-                      {blog.status === "published" ? (
-                        <Eye size={14} />
-                      ) : (
-                        <EyeOff size={14} />
-                      )}
-                      {blog.status}
-                    </Badge>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="relative">
-                      <button
-                        onClick={() =>
-                          setOpenMenuId(
-                            openMenuId === blog._id ? null : blog._id,
-                          )
-                        }
-                        className="p-2 hover:bg-background rounded transition-colors text-foreground/60 hover:text-foreground"
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full">
+              <thead className="bg-background border-b border-border">
+                <tr>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                    Title
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                    Author
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                    Category
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                    Creation Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBlogs.map((blog) => (
+                  <tr
+                    key={blog._id}
+                    className="border-b border-border hover:bg-background/50"
+                  >
+                    <td className="px-6 py-4 truncate line-clamp-1 text-sm text-foreground">
+                      {blog.title}
+                    </td>
+                    <td className="px-6 py-4 text-foreground/70">
+                      {blog.author}
+                    </td>
+                    <td className="px-6 py-4 text-foreground/70">
+                      {blog.category}
+                    </td>
+                    <td className="px-6 py-4 text-foreground/70">
+                      {new Date(blog.createdAt || "").toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge
+                        className={`px-3 py-1 rounded text-xs font-medium flex items-center gap-1 ${
+                          blog.status === "published"
+                            ? "bg-accent/10 text-accent"
+                            : "bg-primary/10 text-primary"
+                        }`}
                       >
-                        <MoreVertical size={20} />
-                      </button>
+                        {blog.status === "published" ? (
+                          <Eye size={14} />
+                        ) : (
+                          <EyeOff size={14} />
+                        )}
+                        {blog.status}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="relative">
+                        <button
+                          onClick={() =>
+                            setOpenMenuId(
+                              openMenuId === blog._id ? null : blog._id,
+                            )
+                          }
+                          className="p-2 hover:bg-background rounded transition-colors text-foreground/60 hover:text-foreground"
+                        >
+                          <MoreVertical size={20} />
+                        </button>
 
-                      {openMenuId === blog._id && (
-                        <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-2">
-                          {/* View */}
-                          <button
-                            onClick={() => {
-                              handleViewBlog(blog);
-                              setOpenMenuId(null);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-background/50 flex items-center gap-2 transition-colors"
-                          >
-                            <Eye size={16} />
-                            View Details
-                          </button>
-
-                          {/* Edit */}
-                          <button
-                            onClick={() => {
-                              handleEdit(blog);
-                              setShowAddDialog(true);
-                              setOpenMenuId(null);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-background/50 flex items-center gap-2 transition-colors"
-                          >
-                            <Edit size={16} />
-                            Edit
-                          </button>
-
-                          {/* Set Featured */}
-                          <button
-                            onClick={() => handleToggleFeatured(blog._id)}
-                            className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors ${                              blog.isFeatured
-                                ? "text-yellow-400 fill-yellow-400 hover:bg-yellow-50/10"
-                                : "text-foreground hover:bg-background/50"
-                            } `}
-                          >
-                            <Star
-                              size={16}
-                              // fill={blog.isFeatured ? "yellow" : "none"}
-                              className={`${blog.isFeatured ? 'text-yellow-400 fill-yellow-400':''}`}
-                            />
-                            {blog.isFeatured ? "Unfeature" : "Set Featured"}
-                          </button>
-
-                          {/* Publish (only for drafts) */}
-                          {blog.status === "draft" && (
+                        {openMenuId === blog._id && (
+                          <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-50 py-2">
+                            {/* View */}
                             <button
-                              onClick={() => handlePublish(blog._id)}
+                              onClick={() => {
+                                handleViewBlog(blog);
+                                setOpenMenuId(null);
+                              }}
                               className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-background/50 flex items-center gap-2 transition-colors"
                             >
-                              <FileUpIcon size={16} />
-                              Publish
+                              <Eye size={16} />
+                              View Details
                             </button>
-                          )}
 
-                          {/* Delete */}
-                          <div className="border-t border-border my-1"></div>
-                          <button
-                            onClick={() => {
-                              handleDelete(blog._id);
-                              setOpenMenuId(null);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50/10 flex items-center gap-2 transition-colors"
-                          >
-                            {saving ? (
-                              <>
-                                Deleting... <Loader className="animate-spin" />
-                              </>
-                            ) : (
-                              <>
-                                {" "}
-                                <Trash2 size={16} />
-                                Delete
-                              </>
+                            {/* Edit */}
+                            <button
+                              onClick={() => {
+                                handleEdit(blog);
+                                setShowAddDialog(true);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-background/50 flex items-center gap-2 transition-colors"
+                            >
+                              <Edit size={16} />
+                              Edit
+                            </button>
+
+                            {/* Set Featured */}
+                            <button
+                              onClick={() => handleToggleFeatured(blog._id)}
+                              className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors ${
+                                blog.isFeatured
+                                  ? "text-yellow-400 fill-yellow-400 hover:bg-yellow-50/10"
+                                  : "text-foreground hover:bg-background/50"
+                              } `}
+                            >
+                              <Star
+                                size={16}
+                                // fill={blog.isFeatured ? "yellow" : "none"}
+                                className={`${blog.isFeatured ? "text-yellow-400 fill-yellow-400" : ""}`}
+                              />
+                              {blog.isFeatured ? "Unfeature" : "Set Featured"}
+                            </button>
+
+                            {/* Publish (only for drafts) */}
+                            {blog.status === "draft" && (
+                              <button
+                                onClick={() => handlePublish(blog._id)}
+                                className="w-full text-left px-4 py-2 text-sm text-foreground hover:bg-background/50 flex items-center gap-2 transition-colors"
+                              >
+                                <FileUpIcon size={16} />
+                                Publish
+                              </button>
                             )}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+
+                            {/* Delete */}
+                            <div className="border-t border-border my-1"></div>
+                            <button
+                              onClick={() => {
+                                handleDelete(blog._id);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50/10 flex items-center gap-2 transition-colors"
+                            >
+                              {saving ? (
+                                <>
+                                  Deleting...{" "}
+                                  <Loader className="animate-spin" />
+                                </>
+                              ) : (
+                                <>
+                                  {" "}
+                                  <Trash2 size={16} />
+                                  Delete
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
       {blogs.length === 0 && (
         <Card className="p-8 text-center">
-         <span className="flex items-center justify-center w-full"> <img src="/no-news.png" className="w-100 h-120 align-middle text-center justify-self-center" alt="" /></span>
+          <span className="flex items-center justify-center w-full">
+            {" "}
+            <img
+              src="/no-news.png"
+              className="w-100 h-120 align-middle text-center justify-self-center"
+              alt=""
+            />
+          </span>
           <p className="text-foreground/70">
             No blog posts found. Click "New Blog Post" to create your first one!
           </p>
@@ -959,9 +967,17 @@ if (res.ok) {
       )}
       {blogs.length > 0 && filteredBlogs.length === 0 && (
         <Card className="p-8 text-center">
-         <span className="flex items-center justify-center w-full"> <img src="/no-campaign.png" className="w-100 h-120 align-middle text-center justify-self-center" alt="" /></span>
+          <span className="flex items-center justify-center w-full">
+            {" "}
+            <img
+              src="/no-campaign.png"
+              className="w-100 h-120 align-middle text-center justify-self-center"
+              alt=""
+            />
+          </span>
           <p className="text-foreground/70">
-            No blog posts found matching your filters. Try adjusting your search or filter criteria.
+            No blog posts found matching your filters. Try adjusting your search
+            or filter criteria.
           </p>
         </Card>
       )}

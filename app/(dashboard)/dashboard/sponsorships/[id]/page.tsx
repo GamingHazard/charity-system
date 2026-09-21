@@ -1363,7 +1363,9 @@ export default function SponsorDetailPage() {
                 <Input
                   id={`editSponsor${field}`}
                   type={field === "email" ? "email" : "text"}
-                  value={String(formState[field as keyof typeof formState] ?? "")}
+                  value={String(
+                    formState[field as keyof typeof formState] ?? "",
+                  )}
                   onChange={(event) =>
                     setFormState((current) => ({
                       ...current,

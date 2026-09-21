@@ -23,9 +23,16 @@ export const metadata: Metadata = {
   description: "Operations dashboard for Seeds of Love Foundation",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${quicksand.className}`}>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} ${quicksand.className}`}
+    >
       <body className="min-h-full antialiased">
         <QueryProvider>
           <AuthProvider>

@@ -25,6 +25,16 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AUTH_TOKEN_KEY = "charity-admin-token";
+const AUTH_USER_KEY = "charity-admin-user";
+
+function getApiBaseUrl() {
+  return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5454/api";
+}
+
+function getAuthHeaders(token: string) {
+  return { Authorization: `Bearer ${token}` };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -33,38 +43,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api";
-        const response = await fetch(`${baseUrl}/auth/admin/me`, {
-          credentials: "include",
-        });
-        if (!response.ok) return;
+        const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+        const savedUser = window.localStorage.getItem(AUTH_USER_KEY);
+        if (!token || !savedUser) return;
 
-        const saved = await response.json();
-        const role = normalizeRole(saved.role);
-        if (role) {
-          setUser({
-            id: String(saved.id),
-            email: saved.email || saved.username,
-            name: saved.name || saved.username,
-            role,
-          });
+        const response = await fetch(`${getApiBaseUrl()}/dashboard/summary`, {
+          headers: getAuthHeaders(token),
+        });
+        if (!response.ok) {
+          window.localStorage.removeItem(AUTH_TOKEN_KEY);
+          window.localStorage.removeItem(AUTH_USER_KEY);
+          return;
         }
+
+        setUser(JSON.parse(savedUser) as User);
+      } catch {
       } finally {
         setIsLoading(false);
       }
-
     };
 
     void restoreSession();
   }, []);
 
   const login = async (email: string, password: string) => {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api";
-    const response = await fetch(`${baseUrl}/auth/admin/login`, {
+    const response = await fetch(`${getApiBaseUrl()}/auth/admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({ username: email, password }),
     });
     const data = await response.json();
@@ -79,16 +84,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: data.username,
       role,
     };
+    window.localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    window.localStorage.setItem(
+      AUTH_USER_KEY,
+      JSON.stringify(authenticatedUser),
+    );
     setUser(authenticatedUser);
   };
 
   const logout = () => {
     setUser(null);
-    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api";
-    void fetch(`${baseUrl}/auth/admin/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
+    const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+    window.localStorage.removeItem(AUTH_TOKEN_KEY);
+    window.localStorage.removeItem(AUTH_USER_KEY);
+    if (token) {
+      void fetch(`${getApiBaseUrl()}/auth/admin/logout`, {
+        method: "POST",
+        headers: getAuthHeaders(token),
+      });
+    }
   };
 
   return (

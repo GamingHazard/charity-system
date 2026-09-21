@@ -158,7 +158,7 @@ export default function SponsorshipsDashboard() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: sponsorships, isLoading } = useQuery<SponsorProfile[]>({
-    queryKey: ["sponsors", "profiles", "all"],
+    queryKey: ["sponsors", "profile", "all"],
   });
   const { data: childrenData = [] } = useQuery<any[]>({
     queryKey: ["children", "profiles"],
@@ -288,7 +288,7 @@ export default function SponsorshipsDashboard() {
       setSelectedSponsorProfile(result.sponsor);
       setIsEditProfileOpen(false);
       await queryClient.invalidateQueries({
-        queryKey: ["sponsors", "profiles", "all"],
+        queryKey: ["sponsors", "profile", "all"],
       });
     } catch (error) {
       console.error("Error updating sponsor profile:", error);
@@ -363,7 +363,7 @@ export default function SponsorshipsDashboard() {
       }
 
       await queryClient.invalidateQueries({
-        queryKey: ["sponsors", "profiles", "all"],
+        queryKey: ["sponsors", "profile", "all"],
       });
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],
@@ -389,7 +389,7 @@ export default function SponsorshipsDashboard() {
     try {
       await apiRequest("DELETE", `/sponsors/profile/${archiveTarget._id}`);
       await queryClient.invalidateQueries({
-        queryKey: ["sponsors", "profiles", "all"],
+        queryKey: ["sponsors", "profile", "all"],
       });
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],
@@ -427,7 +427,7 @@ export default function SponsorshipsDashboard() {
         ),
       );
       await queryClient.invalidateQueries({
-        queryKey: ["sponsors", "profiles", "all"],
+        queryKey: ["sponsors", "profile", "all"],
       });
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],
@@ -503,7 +503,7 @@ export default function SponsorshipsDashboard() {
         ),
       );
       await queryClient.invalidateQueries({
-        queryKey: ["sponsors", "profiles", "all"],
+        queryKey: ["sponsors", "profile", "all"],
       });
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],

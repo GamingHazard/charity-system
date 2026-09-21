@@ -1,17 +1,35 @@
- import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import axios from "axios";
 
-const BASE_URL =  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000/api";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5454/api";
+
+const AUTH_TOKEN_KEY = "charity-admin-token";
+
+function getAuthHeaders() {
+  if (typeof window === "undefined") return {};
+
+  const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 // simple in-memory rate limit tracker (requests per window)
-const REQUEST_THRESHOLD = parseInt(process.env.NEXT_PUBLIC_VITE_API_THRESHOLD || "60", 10); // max requests per window
-const THROTTLE_WINDOW = parseInt(process.env.NEXT_PUBLIC_VITE_THROTTLE_WINDOW || "60000", 10); // 1 minute by default
+const REQUEST_THRESHOLD = parseInt(
+  process.env.NEXT_PUBLIC_VITE_API_THRESHOLD || "60",
+  10,
+); // max requests per window
+const THROTTLE_WINDOW = parseInt(
+  process.env.NEXT_PUBLIC_VITE_THROTTLE_WINDOW || "60000",
+  10,
+); // 1 minute by default
 let requestTimestamps: number[] = [];
 
 function checkRateLimit() {
   const now = Date.now();
   // drop old timestamps
-  requestTimestamps = requestTimestamps.filter(ts => now - ts < THROTTLE_WINDOW);
+  requestTimestamps = requestTimestamps.filter(
+    (ts) => now - ts < THROTTLE_WINDOW,
+  );
   if (requestTimestamps.length >= REQUEST_THRESHOLD) {
     throw new Error("API request limit exceeded, please try again later");
   }
@@ -47,6 +65,7 @@ export async function apiRequest(
 
   // prepare headers/body properly; support FormData by letting the browser set multipart boundary
   const headers: Record<string, string> = {};
+  Object.assign(headers, getAuthHeaders());
   let body: BodyInit | undefined;
 
   if (data instanceof FormData) {
@@ -91,6 +110,7 @@ export const getQueryFn: <T>(options: {
       const response = await axiosClient.get(url, {
         signal: controller.signal,
         withCredentials: true,
+        headers: getAuthHeaders(),
       });
 
       return response.data;
@@ -109,20 +129,19 @@ export const getQueryFn: <T>(options: {
     }
   };
 
-
 // ✅ React Query Global Config - OPTIMIZED for performance
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
-      staleTime: 5 * 60 * 1000,  // 5 minutes (was 10 seconds)
-      gcTime: 10 * 60 * 1000,    // 10 minutes (formerly cacheTime)
+      staleTime: 5 * 60 * 1000, // 5 minutes (was 10 seconds)
+      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
       refetchOnWindowFocus: false, // Don't refetch on window focus
-      refetchInterval: false,     // No automatic refetching (was 5000ms)
-      retry: 1,                   // Reduce retry attempts (was true = 3 attempts)
+      refetchInterval: false, // No automatic refetching (was 5000ms)
+      retry: 1, // Reduce retry attempts (was true = 3 attempts)
     },
     mutations: {
-      retry: 1,  // Reduce mutation retries
+      retry: 1, // Reduce mutation retries
     },
   },
 });
