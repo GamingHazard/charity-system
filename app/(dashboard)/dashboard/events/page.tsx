@@ -35,6 +35,7 @@ import {
 import { set } from "react-hook-form";
 import { apiRequest } from "@/lib/query-client";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 interface Event {
   _id: string;
@@ -236,9 +237,12 @@ export default function EventsPage() {
     setSaving(true);
 
     try {
-      await apiRequest("DELETE", `/events/delete/${id}`);
+      const response = await apiRequest("DELETE", `/events/delete/${id}`);
+      if (!response.ok) throw new Error("Failed to delete event");
       setEvents(events.filter((event) => event._id !== id));
+      toast({ title: "Event deleted", description: "The event was deleted successfully." });
     } catch (error) {
+      toast({ variant: "destructive", title: "Unable to delete event", description: "Please try again." });
     } finally {
       setSaving(false);
     }
@@ -290,7 +294,8 @@ export default function EventsPage() {
       };
 
       if (editData && editData._id) {
-        await apiRequest("PUT", `/events/${editData._id}/update`, newEvent);
+        const response = await apiRequest("PUT", `/events/${editData._id}/update`, newEvent);
+        if (!response.ok) throw new Error("Failed to update event");
         setEvents(
           events.map((event: any) =>
             event._id === editData._id ? { ...event, ...newEvent } : event,
@@ -302,16 +307,21 @@ export default function EventsPage() {
           const data = await res.json();
           setEvents([...events, data?.newEvent]);
         } else {
-          return;
+          throw new Error("Failed to create event");
         }
       }
 
       resetNewEventForm();
       setShowAddDialog(false);
+      toast({
+        title: editData?._id ? "Event updated" : "Event created",
+        description: editData?._id
+          ? "The event was updated successfully."
+          : "The event was created successfully.",
+      });
     } catch (error) {
-      console.log("====================================");
-      console.log(error);
-      console.log("====================================");
+      console.error("Error saving event:", error);
+      toast({ variant: "destructive", title: "Unable to save event", description: "Please try again." });
     } finally {
       setSaving(false);
     }
@@ -456,7 +466,10 @@ export default function EventsPage() {
 
       {/* Add Event Dialog */}
       <Dialog open={showAddDialog} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="w-full  bg-card max-h-160 overflow-y-auto max-w-2xl">
+        <DialogContent
+          preventDismiss
+          className="w-full  bg-card max-h-160 overflow-y-auto max-w-2xl"
+        >
           <DialogHeader>
             <DialogTitle>Create New Event</DialogTitle>
             <DialogDescription>

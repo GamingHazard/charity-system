@@ -38,11 +38,14 @@ import {
   Loader,
   MoreHorizontal,
   Eye,
+  Download,
 } from "lucide-react";
-import { mockSponsorshipProfiles, SponsorshipProfile } from "@/lib/mock-data";
+import type { SponsorshipProfile } from "@/lib/types";
 import { uploadImageToCloudinary } from "@/lib/cloudinary-upload";
 import { apiRequest } from "@/lib/query-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
+import { ServerError } from "@/components/ui/server-error";
 
 const initialFormState: any = {
   _id: "",
@@ -101,6 +104,21 @@ const initialFormState: any = {
   sponsorshipStatus: "Available",
 };
 
+const educationLevels = [
+  "kindergarten",
+  "primary",
+  "secondary",
+  "vocational",
+  "university",
+] as const;
+
+function normalizeEducationLevel(value?: string) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return educationLevels.includes(normalized as (typeof educationLevels)[number])
+    ? normalized
+    : "";
+}
+
 type FormState = typeof initialFormState;
 
 function getStatusBadgeClass(status: string) {
@@ -149,6 +167,102 @@ function getSponsorProfile(child: SponsorshipProfile) {
   }
 
   return sponsor.sponsor || sponsor;
+}
+
+const childExportHeaders = [
+  "Child ID",
+  "First Name",
+  "Second Name",
+  "Given Name",
+  "Gender",
+  "Date of Birth",
+  "Age",
+  "Age Group",
+  "Nationality",
+  "School",
+  "Class",
+  "Education Level",
+  "Academic Year",
+  "Family Status",
+  "Number of Parents",
+  "Guardian Name",
+  "Guardian Contact",
+  "Guardian Relationship",
+  "Location",
+  "Needs",
+  "Monthly Need",
+  "Progress",
+  "Sponsorship Status",
+  "Sponsor ID",
+  "Sponsor Name",
+  "Sponsor Email",
+  "Sponsor Phone",
+  "Sponsorship Start Date",
+  "Sponsorship Period",
+  "Sponsorship Amount",
+  "Sponsorship Record ID",
+] as const;
+
+type ChildExportRow = Record<
+  (typeof childExportHeaders)[number],
+  string | number
+>;
+
+function getChildExportRow(child: SponsorshipProfile): ChildExportRow {
+  const rawSponsor = (child as any).sponsor;
+  const sponsor = getSponsorProfile(child) as any;
+  const sponsorshipRecord =
+    rawSponsor && typeof rawSponsor === "object" ? rawSponsor : null;
+  const needs = Array.isArray(child.needs)
+    ? child.needs.filter(Boolean).join(", ")
+    : child.needs || "";
+
+  return {
+    "Child ID": child._id || "",
+    "First Name": child.firstName || "",
+    "Second Name": child.secondName || "",
+    "Given Name": child.givenName || "",
+    Gender: child.gender || "",
+    "Date of Birth": child.dateOfBirth || "",
+    Age: child.age ?? "",
+    "Age Group": child.ageGroup || "",
+    Nationality: child.nationality || "",
+    School: child.school || child.education?.schoolName || "",
+    "Class":
+      child.class || child.education?.classGrade || child.education?.currentClass || "",
+    "Education Level": child.education?.currentLevel || "",
+    "Academic Year": child.education?.academicYear || "",
+    "Family Status": child.familyStatus || "",
+    "Number of Parents": child.numberOfParents ?? "",
+    "Guardian Name": child.guardianName || "",
+    "Guardian Contact": child.guardianContact || "",
+    "Guardian Relationship": child.guardianRelation || "",
+    Location: child.location || "",
+    Needs: needs,
+    "Monthly Need": child.monthlyNeed || "",
+    Progress: child.progress ?? "",
+    "Sponsorship Status": child.sponsorshipStatus || "",
+    "Sponsor ID": sponsor?.sponsorId || sponsor?._id || "",
+    "Sponsor Name": sponsor?.fullName || sponsor?.name || "",
+    "Sponsor Email": sponsor?.email || "",
+    "Sponsor Phone": sponsor?.phone || "",
+    "Sponsorship Start Date": sponsorshipRecord?.startDate || "",
+    "Sponsorship Period": sponsorshipRecord?.donation?.period || "",
+    "Sponsorship Amount": sponsorshipRecord?.donation?.amount ?? "",
+    "Sponsorship Record ID":
+      sponsorshipRecord?.sponsor && sponsorshipRecord?._id
+        ? sponsorshipRecord._id
+        : "",
+  };
+}
+
+function downloadChildrenFile(content: string, filename: string, type: string) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function formatDisplayDate(value?: string | Date | null) {
@@ -221,6 +335,7 @@ export default function ChildrenDashboard() {
     "all" | "Available" | "Sponsored"
   >("all");
   const [formError, setFormError] = useState("");
+  const [pageError, setPageError] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -241,9 +356,7 @@ export default function ChildrenDashboard() {
   });
 
   useEffect(() => {
-    if (mockSponsorshipProfiles) {
-      setChildren(mockSponsorshipProfiles);
-    }
+    setChildren(Array.isArray(Profiles) ? Profiles : []);
   }, [Profiles]);
 
   const filteredChildren = useMemo(() => {
@@ -385,6 +498,39 @@ export default function ChildrenDashboard() {
     setIsDialogOpen(true);
   };
 
+  const exportChildrenCsv = () => {
+    if (children.length === 0) return;
+
+    const rows = children.map(getChildExportRow);
+    const escapeCsvValue = (value: string | number) =>
+      `"${String(value).replace(/"/g, '""')}"`;
+    const csv = [
+      childExportHeaders,
+      ...rows.map((row) =>
+        childExportHeaders.map((header) => row[header]),
+      ),
+    ]
+      .map((row) => row.map(escapeCsvValue).join(","))
+      .join("\r\n");
+
+    downloadChildrenFile(
+      `\ufeff${csv}`,
+      "children-profiles.csv",
+      "text/csv;charset=utf-8",
+    );
+  };
+
+  const exportChildrenJson = () => {
+    if (children.length === 0) return;
+
+    const rows = children.map(getChildExportRow);
+    downloadChildrenFile(
+      JSON.stringify(rows, null, 2),
+      "children-profiles.json",
+      "application/json;charset=utf-8",
+    );
+  };
+
   const openEditProfile = (child: SponsorshipProfile) => {
     setEditingChild(child);
     setFormState({
@@ -405,8 +551,8 @@ export default function ChildrenDashboard() {
       guardianContact: child.guardianContact || "",
       guardianRelation: child.guardianRelation || "caretaker",
       image: {
-        url: child.image.url,
-        public_id: child.image.public_id,
+        url: child.image?.url || "",
+        public_id: child.image?.public_id || "",
       },
       background: child.background,
       school: child.school,
@@ -418,7 +564,7 @@ export default function ChildrenDashboard() {
       education: {
         isStudying:
           child.education?.isStudying ?? Boolean(child.education?.currentLevel),
-        currentLevel: child.education?.currentLevel || "",
+        currentLevel: normalizeEducationLevel(child.education?.currentLevel),
         schoolName: child.education?.schoolName || child.school || "",
         classGrade:
           child.education?.classGrade || child.education?.currentClass || "",
@@ -437,7 +583,7 @@ export default function ChildrenDashboard() {
       progress: child.progress,
       sponsorshipStatus: child.sponsorshipStatus,
     } as FormState);
-    setImagePreview(child.image.url);
+    setImagePreview(child.image?.url || "");
     setIsDialogOpen(true);
   };
 
@@ -500,6 +646,7 @@ export default function ChildrenDashboard() {
 
   const handleAssignSponsor = async () => {
     if (!assigningChild) return;
+    setPageError("");
 
     const selectedSponsor = sponsorOptions.find(
       (option: any) => option._id === assignmentForm.selectedSponsorId,
@@ -540,6 +687,7 @@ export default function ChildrenDashboard() {
       };
 
       const res = await apiRequest("PATCH", "/sponsors/reassign", payload);
+      if (!res.ok) throw new Error("Failed to assign sponsor");
       const data = await res.json();
 
       const updatedChild = {
@@ -566,9 +714,23 @@ export default function ChildrenDashboard() {
 
       setAssigningChild(null);
       setIsAssignDialogOpen(false);
+      toast({
+        title: "Sponsor assigned",
+        description: "The sponsor was assigned to this child successfully.",
+      });
     } catch (error) {
       console.error("Error assigning sponsor:", error);
-      setFormError("Failed to assign sponsor to this child.");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to assign sponsor to this child.";
+      setFormError(message);
+      setPageError(message);
+      toast({
+        variant: "destructive",
+        title: "Unable to assign sponsor",
+        description: message,
+      });
     } finally {
       setAssigningSponsor(false);
     }
@@ -582,6 +744,7 @@ export default function ChildrenDashboard() {
   };
 
   const handleDeleteProfile = async (id: string) => {
+    setPageError("");
     try {
       setDeleting(true);
       const res = await apiRequest("DELETE", `/children/profile/${id}/delete`);
@@ -589,10 +752,20 @@ export default function ChildrenDashboard() {
         throw new Error("Failed to delete child profile");
       }
       setChildren(children.filter((child) => child._id !== id));
+      toast({
+        title: "Child profile deleted",
+        description: "The child profile was removed successfully.",
+      });
     } catch (error) {
-      console.log("====================================");
-      console.log(error);
-      console.log("====================================");
+      console.error("Error deleting child profile:", error);
+      setPageError(
+        error instanceof Error ? error.message : "Failed to delete child profile",
+      );
+      toast({
+        variant: "destructive",
+        title: "Unable to delete child profile",
+        description: "Please try again.",
+      });
     } finally {
       setDeleting(false);
     }
@@ -647,6 +820,7 @@ export default function ChildrenDashboard() {
     if (!validateStep()) {
       return;
     }
+    setPageError("");
     setLoading(true);
     try {
       let data: any = null;
@@ -704,6 +878,7 @@ export default function ChildrenDashboard() {
       } else {
         res = await apiRequest("POST", `/children/profile/new`, payload);
       }
+      if (!res.ok) throw new Error("Failed to save child profile");
       data = await res.json();
 
       if (
@@ -766,10 +941,22 @@ export default function ChildrenDashboard() {
 
       setIsDialogOpen(false);
       resetForm();
+      toast({
+        title: editingChild ? "Child profile updated" : "Child profile created",
+        description: editingChild
+          ? "The child profile was updated successfully."
+          : "The child profile was created successfully.",
+      });
     } catch (error) {
-      console.log("====================================");
-      console.log(error);
-      console.log("====================================");
+      console.error("Error saving child profile:", error);
+      const message =
+        error instanceof Error ? error.message : "Failed to save child profile";
+      setPageError(message);
+      toast({
+        variant: "destructive",
+        title: "Unable to save child profile",
+        description: "Please check the form and try again.",
+      });
     } finally {
       setLoading(false);
     }
@@ -1065,22 +1252,30 @@ export default function ChildrenDashboard() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="currentLevel">Education level</Label>
-              <Input
-                className="bg-background"
-                id="currentLevel"
-                placeholder="Primary, Secondary, University"
+              <Label htmlFor="currentLevel">Current level</Label>
+              <Select
                 value={formState.education.currentLevel}
-                onChange={(event) =>
+                onValueChange={(value) =>
                   setFormState({
                     ...formState,
                     education: {
                       ...formState.education,
-                      currentLevel: event.target.value,
+                      currentLevel: value,
                     },
                   })
                 }
-              />
+              >
+                <SelectTrigger className="bg-background" id="currentLevel">
+                  <SelectValue placeholder="Select current level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kindergarten">Kindergarten</SelectItem>
+                  <SelectItem value="primary">Primary</SelectItem>
+                  <SelectItem value="secondary">Secondary</SelectItem>
+                  <SelectItem value="vocational">Vocational</SelectItem>
+                  <SelectItem value="university">University</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -1845,9 +2040,26 @@ export default function ChildrenDashboard() {
             roster of supported children.
           </p>
         </div>
-        <Button onClick={openNewProfile} className="w-full md:w-auto">
-          <Plus className="mr-2" size={16} /> Add new child
-        </Button>
+        <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full md:w-auto">
+                <Download className="mr-2" size={16} /> Export profiles
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={exportChildrenCsv}>
+                Export CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportChildrenJson}>
+                Export JSON
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button onClick={openNewProfile} className="w-full md:w-auto">
+            <Plus className="mr-2" size={16} /> Add new child
+          </Button>
+        </div>
       </div>
 
       <Card className="p-6 mb-8 bg-card border-border">
@@ -1908,7 +2120,7 @@ export default function ChildrenDashboard() {
 
               <div className="absolute left-4 top-4">
                 <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(child.sponsorshipStatus)}`}
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(child.sponsorshipStatus || "Available")}`}
                 >
                   {child.sponsorshipStatus}
                 </span>
@@ -2013,7 +2225,10 @@ export default function ChildrenDashboard() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl bg-card  overflow-y-auto">
+        <DialogContent
+          preventDismiss
+          className="max-w-2xl bg-card  overflow-y-auto"
+        >
           <DialogHeader>
             <DialogTitle>
               {assigningChild
@@ -2092,7 +2307,10 @@ export default function ChildrenDashboard() {
       </Dialog>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl bg-card overflow-auto h-140">
+        <DialogContent
+          preventDismiss
+          className="max-w-4xl bg-card overflow-auto h-140"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingChild ? "Edit child profile" : "New child profile"}
@@ -2210,7 +2428,7 @@ export default function ChildrenDashboard() {
                   </div>
 
                   <span
-                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(viewingChild.sponsorshipStatus)}`}
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(viewingChild.sponsorshipStatus || "Available")}`}
                   >
                     {viewingChild.sponsorshipStatus}
                   </span>
@@ -2746,6 +2964,7 @@ export default function ChildrenDashboard() {
           )}
         </DialogContent>
       </Dialog>
+      <ServerError message={pageError} />
     </div>
   );
 }

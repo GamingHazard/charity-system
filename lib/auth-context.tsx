@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const savedUser = window.localStorage.getItem(AUTH_USER_KEY);
         if (!token || !savedUser) return;
 
-        const response = await fetch(`${getApiBaseUrl()}/dashboard/summary`, {
+        const response = await fetch(`${getApiBaseUrl()}/auth/admin/me`, {
           headers: getAuthHeaders(token),
         });
         if (!response.ok) {
@@ -56,7 +56,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        setUser(JSON.parse(savedUser) as User);
+        const currentAdmin = await response.json();
+        const restoredUser: User = {
+          id: String(currentAdmin.id),
+          email: JSON.parse(savedUser).email,
+          name: currentAdmin.username,
+          role: normalizeRole(currentAdmin.role) as UserRole,
+        };
+        setUser(restoredUser);
       } catch {
       } finally {
         setIsLoading(false);

@@ -52,6 +52,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/query-client";
 import { uploadImageToCloudinary } from "@/lib/cloudinary-upload";
+import { toast } from "@/hooks/use-toast";
+import { ServerError } from "@/components/ui/server-error";
 import { Camera, Loader2 } from "lucide-react";
 
 type SponsorDetail = {
@@ -141,6 +143,34 @@ function formatDisplayDate(value?: string | Date | null) {
   });
 }
 
+async function loadSponsorPdfImage(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Unable to load an image for the PDF.");
+
+  const blob = await response.blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Unable to prepare PDF image."));
+    reader.readAsDataURL(blob);
+  });
+
+  const dimensions = await new Promise<{ width: number; height: number }>(
+    (resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve({ width: image.width, height: image.height });
+      image.onerror = () => reject(new Error("Unable to read PDF image."));
+      image.src = dataUrl;
+    },
+  );
+
+  return {
+    dataUrl,
+    format: blob.type.includes("png") ? "PNG" : "JPEG",
+    ...dimensions,
+  } as const;
+}
+
 export default function SponsorDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -179,6 +209,7 @@ export default function SponsorDetailPage() {
     customAmounts: {} as Record<string, string>,
   });
   const [formError, setFormError] = useState("");
+  const [pageError, setPageError] = useState("");
   const [formState, setFormState] = useState({
     fullName: "",
     email: "",
@@ -200,6 +231,7 @@ export default function SponsorDetailPage() {
   const [childrenOptions, setChildrenOptions] = useState<any[]>([]);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imageError, setImageError] = useState("");
+  const [isExportingProfile, setIsExportingProfile] = useState(false);
 
   useEffect(() => {
     if (!sponsorId) return;
@@ -420,54 +452,237 @@ export default function SponsorDetailPage() {
     pdf.save(`sponsor-donations-${sponsorId}.pdf`);
   };
 
-  const exportSponsorProfilePdf = () => {
-    const profileData = profile || ({} as SponsorDetail);
-    const pdf = new jsPDF({ unit: "mm", format: "a4" });
-    const margin = 18;
-    let y = 22;
+  const exportSponsorProfilePdf = async () => {
+    if (!profile) return;
 
-    pdf.setFontSize(18);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Sponsor profile", margin, y);
-    y += 10;
-    pdf.setFontSize(10);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(`Exported: ${new Date().toLocaleDateString()}`, margin, y);
-    y += 12;
+    setIsExportingProfile(true);
+    try {
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 16;
+      const contentWidth = pageWidth - margin * 2;
+      const bottom = pageHeight - 18;
+      const colors = {
+        ink: [28, 36, 33] as [number, number, number],
+        muted: [102, 112, 107] as [number, number, number],
+        accent: [47, 112, 94] as [number, number, number],
+        pale: [241, 245, 242] as [number, number, number],
+        line: [218, 225, 220] as [number, number, number],
+      };
+      const value = (item: unknown) => {
+        const text = String(item ?? "").trim();
+        return text || "Not provided";
+      };
+      let cursor = margin;
+      const setText = (color = colors.ink) => pdf.setTextColor(...color);
+      const footer = () => {
+        pdf.setDrawColor(...colors.line);
+        pdf.line(margin, pageHeight - 14, pageWidth - margin, pageHeight - 14);
+        setText(colors.muted);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7.5);
+        pdf.text("Confidential sponsor profile", margin, pageHeight - 8);
+        pdf.text(`Page ${pdf.getNumberOfPages()}`, pageWidth - margin, pageHeight - 8, { align: "right" });
+      };
+      const newPage = (title?: string) => {
+        footer();
+        pdf.addPage();
+        cursor = margin;
+        if (title) {
+          setText(colors.ink);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(18);
+          pdf.text(title, margin, cursor + 5);
+          cursor += 15;
+        }
+      };
+      const ensureSpace = (height: number, title?: string) => {
+        if (cursor + height > bottom) newPage(title);
+      };
+      const section = (title: string) => {
+        ensureSpace(18, title);
+        cursor += 4;
+        setText(colors.accent);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(13);
+        pdf.text(title.toUpperCase(), margin, cursor);
+        pdf.setDrawColor(...colors.accent);
+        pdf.setLineWidth(0.8);
+        pdf.line(margin, cursor + 4, pageWidth - margin, cursor + 4);
+        cursor += 12;
+      };
+      const paragraph = (label: string, item: unknown) => {
+        const lines = pdf.splitTextToSize(value(item), contentWidth);
+        ensureSpace(10 + lines.length * 4.2);
+        setText(colors.muted);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8);
+        pdf.text(label.toUpperCase(), margin, cursor);
+        cursor += 5;
+        setText(colors.ink);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9.5);
+        pdf.text(lines, margin, cursor);
+        cursor += lines.length * 4.2 + 5;
+      };
+      const twoColumns = (rows: Array<[string, unknown]>) => {
+        const width = contentWidth / 2 - 5;
+        for (let index = 0; index < rows.length; index += 2) {
+          ensureSpace(14);
+          const draw = ([label, item]: [string, unknown], x: number) => {
+            setText(colors.muted);
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(7.5);
+            pdf.text(label.toUpperCase(), x, cursor);
+            setText(colors.ink);
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(9);
+            pdf.text(pdf.splitTextToSize(value(item), width), x, cursor + 5);
+          };
+          draw(rows[index], margin);
+          if (rows[index + 1]) draw(rows[index + 1], margin + contentWidth / 2 + 5);
+          cursor += 14;
+        }
+      };
+      const imageFrame = async (url: string | undefined, x: number, y: number, width: number, height: number) => {
+        pdf.setFillColor(...colors.pale);
+        pdf.roundedRect(x, y, width, height, 2, 2, "F");
+        if (!url) {
+          setText(colors.muted);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9);
+          pdf.text("Image not available", x + width / 2, y + height / 2, { align: "center" });
+          return;
+        }
+        const image = await loadSponsorPdfImage(url);
+        const scale = Math.min(width / image.width, height / image.height);
+        pdf.addImage(image.dataUrl, image.format, x + (width - image.width * scale) / 2, y + (height - image.height * scale) / 2, image.width * scale, image.height * scale);
+      };
 
-    const field = (label: string, value: unknown) => {
+      setText(colors.accent);
       pdf.setFont("helvetica", "bold");
-      pdf.text(`${label}:`, margin, y);
+      pdf.setFontSize(9);
+      pdf.text("ENSIGO OF LOVE FOUNDATION", margin, cursor);
+      setText(colors.muted);
       pdf.setFont("helvetica", "normal");
-      pdf.text(String(value || "Not provided"), margin + 42, y);
-      y += 7;
-    };
-
-    const section = (title: string) => {
-      y += 4;
+      pdf.setFontSize(8);
+      pdf.text(new Date().toLocaleDateString(), pageWidth - margin, cursor, { align: "right" });
+      cursor += 12;
+      setText(colors.ink);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(12);
-      pdf.text(title, margin, y);
-      pdf.setFontSize(10);
-      y += 8;
-    };
+      pdf.setFontSize(24);
+      pdf.text("PROFILE & BIO", margin, cursor);
+      cursor += 8;
+      setText(colors.muted);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text("A complete sponsor profile and sponsorship record.", margin, cursor);
+      cursor += 10;
 
-    section("Contact");
-    field("Name", sponsorName);
-    field("Email", email);
-    field("Phone", phone);
-    field("Location", cityState);
-    field("Bio", sponsorProfile.bio);
-    field("Profile status", profileData.profileStatus || sponsor.profileStatus);
-    field("Created", formatDisplayDate((sponsor as any).createdAt));
+      const photoTop = cursor;
+      await imageFrame(sponsor.image?.url, margin, photoTop, 62, 68);
+      const detailsX = margin + 74;
+      const details: Array<[string, unknown]> = [
+        ["Name", sponsorName],
+        ["Email", email],
+        ["Phone", phone],
+        ["Location", cityState],
+        ["Status", profile.profileStatus || sponsor.profileStatus],
+        ["Created", formatDisplayDate((sponsor as any).createdAt)],
+      ];
+      details.forEach(([label, item]) => {
+        setText(colors.muted);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7.5);
+        pdf.text(label.toUpperCase(), detailsX, cursor);
+        setText(colors.ink);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.text(pdf.splitTextToSize(value(item), contentWidth - 74), detailsX, cursor + 5);
+        cursor += 10;
+      });
+      cursor = photoTop + 76;
+      paragraph("Biography", sponsorProfile.bio);
 
-    section("Sponsorship summary");
-    field("Linked sponsorships", profileData.summary?.totalChildren);
-    field("Total pledged", `${totalPledged} - ${plegedFrequency}`);
-    field("Total paid", totalPaid);
-    field("Payment method", sponsor.paymentMethod);
+      section("Family");
+      twoColumns([
+        ["Email", email],
+        ["Phone", phone],
+        ["Address", location.address],
+        ["Country", location.country],
+        ["City", location.city],
+        ["Region", location.region],
+      ]);
 
-    pdf.save(`sponsor-profile-${sponsorId}.pdf`);
+      section("Education");
+      paragraph("Sponsor background", sponsorProfile.bio);
+      paragraph("Linked children", sponsoredChildren.length);
+      if (sponsoredChildren.length) {
+        for (const entry of sponsoredChildren) {
+          const child = entry.child || {};
+          ensureSpace(32);
+          const childName = child.givenName || [child.firstName, child.secondName].filter(Boolean).join(" ") || "Child";
+          await imageFrame(child.image?.url, margin, cursor, 24, 27);
+          setText(colors.ink);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(9.5);
+          pdf.text(childName, margin + 31, cursor + 7);
+          setText(colors.muted);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(8.5);
+          pdf.text(`${value(child.school)} | ${value(child.class)}`, margin + 31, cursor + 13);
+          pdf.text(`Sponsorship: ${value(entry.status)} | ${value(entry.frequency)}`, margin + 31, cursor + 19);
+          cursor += 34;
+        }
+      }
+
+      section("Sponsor Details");
+      twoColumns([
+        ["Sponsorship status", profile.profileStatus || sponsor.profileStatus],
+        ["Linked sponsorships", profile.summary?.totalChildren],
+        ["Total pledged", `${totalPledged} ${plegedFrequency}`],
+        ["Total paid", totalPaid],
+        ["Payment method", sponsor.paymentMethod],
+        ["Email reminders", sponsor.donation?.remindByEmail ? "Enabled" : "Disabled"],
+      ]);
+      if (paymentHistory.length) {
+        paymentHistory.forEach((payment: any) => {
+          paragraph("Payment", `${formatDisplayDate(payment.date)} | ${value(payment.amount)} ${value(payment.currency || "UGX")} | ${value(payment.method)} | ${value(payment.transactionId)}`);
+        });
+      } else {
+        paragraph("Payment history", "No payment history available.");
+      }
+      footer();
+
+      const reportCards = sponsoredChildren.flatMap((entry: any) =>
+        (entry.child?.reportCards || []).map((card: any) => ({
+          ...card,
+          childName: entry.child?.givenName || entry.child?.firstName || "Child",
+        })),
+      );
+      if (reportCards.length) {
+        for (const card of reportCards) {
+          newPage("REPORT CARDS");
+          setText(colors.ink);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(13);
+          pdf.text(`${value(card.childName)} - ${value(card.name)}`, margin, cursor);
+          cursor += 8;
+          if (String(card.fileType || "").toLowerCase().includes("pdf")) {
+            paragraph("Document", "This report card is available as a separate PDF in the dashboard.");
+          } else {
+            await imageFrame(card.url, margin, cursor, contentWidth, pageHeight - cursor - 28);
+          }
+        }
+        footer();
+      }
+      pdf.save(`sponsor-profile-${sponsorId}.pdf`);
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : "Unable to export sponsor profile PDF.");
+    } finally {
+      setIsExportingProfile(false);
+    }
   };
 
   const tabs = [
@@ -577,6 +792,11 @@ export default function SponsorDetailPage() {
     } catch (error) {
       console.error("Error updating sponsor profile:", error);
       setFormError("Unable to save the sponsor profile. Please try again.");
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : "Unable to save the sponsor profile.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -604,6 +824,11 @@ export default function SponsorDetailPage() {
       console.error("Error archiving sponsor profile:", error);
       setArchiveError(
         "Unable to archive this sponsor profile. Please try again.",
+      );
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : "Unable to archive this sponsor profile.",
       );
     } finally {
       setIsArchiving(false);
@@ -645,6 +870,11 @@ export default function SponsorDetailPage() {
     } catch (error) {
       console.error("Error unlinking child sponsor:", error);
       setUnlinkError("Unable to unlink this child. Please try again.");
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : "Unable to unlink this child.",
+      );
     } finally {
       setIsUnlinking(false);
     }
@@ -701,6 +931,9 @@ export default function SponsorDetailPage() {
         error instanceof Error
           ? error.message
           : "Unable to upload sponsor image.",
+      );
+      setPageError(
+        error instanceof Error ? error.message : "Unable to upload sponsor image.",
       );
     } finally {
       setIsUploadingImage(false);
@@ -866,6 +1099,9 @@ export default function SponsorDetailPage() {
       setPaymentError(
         error instanceof Error ? error.message : "Unable to record donation.",
       );
+      setPageError(
+        error instanceof Error ? error.message : "Unable to record donation.",
+      );
     } finally {
       setIsRecordingPayment(false);
     }
@@ -930,10 +1166,11 @@ export default function SponsorDetailPage() {
       </Button>
       <Button
         className="absolute top-10 right-3"
-        onClick={exportSponsorProfilePdf}
+        onClick={() => void exportSponsorProfilePdf()}
+        disabled={isExportingProfile}
       >
         <Download className="mr-2 size-4" />
-        Export profile
+        {isExportingProfile ? "Preparing PDF..." : "Export profile"}
       </Button>
 
       <div className="mt-2 grid gap-6 lg:grid-cols-[320px_1fr]">
@@ -1342,7 +1579,7 @@ export default function SponsorDetailPage() {
       </div>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent preventDismiss className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit sponsor profile</DialogTitle>
           </DialogHeader>
@@ -1543,7 +1780,10 @@ export default function SponsorDetailPage() {
           if (!isRecordingPayment) setIsPaymentDialogOpen(open);
         }}
       >
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogContent
+          preventDismiss
+          className="max-h-[90vh] max-w-2xl overflow-y-auto"
+        >
           <DialogHeader>
             <DialogTitle>Record donation</DialogTitle>
           </DialogHeader>
@@ -1901,6 +2141,7 @@ export default function SponsorDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <ServerError message={pageError} />
     </div>
   );
 }

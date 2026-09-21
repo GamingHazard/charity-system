@@ -28,8 +28,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/query-client";
 import { uploadImageToCloudinary } from "@/lib/cloudinary-upload";
+import { toast } from "@/hooks/use-toast";
+import { ServerError } from "@/components/ui/server-error";
 import { jsPDF } from "jspdf";
-import type { SponsorshipProfile } from "@/lib/mock-data";
+import type { SponsorshipProfile } from "@/lib/types";
 import {
   ArrowLeft,
   Download,
@@ -67,6 +69,31 @@ function formatList(value: any) {
   return value || "Not provided";
 }
 
+async function loadPdfImage(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Unable to load an image for the PDF.");
+
+  const blob = await response.blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Unable to prepare PDF image."));
+    reader.readAsDataURL(blob);
+  });
+
+  const dimensions = await new Promise<{ width: number; height: number }>(
+    (resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve({ width: image.width, height: image.height });
+      image.onerror = () => reject(new Error("Unable to read PDF image."));
+      image.src = dataUrl;
+    },
+  );
+
+  const format = blob.type.includes("png") ? "PNG" : "JPEG";
+  return { dataUrl, format, ...dimensions };
+}
+
 function getStatusBadgeClass(status?: string) {
   switch (status) {
     case "Available":
@@ -94,6 +121,7 @@ export default function ChildDetailPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [pageError, setPageError] = useState("");
   const [formState, setFormState] = useState<any>(null);
   const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
@@ -107,6 +135,7 @@ export default function ChildDetailPage() {
   const [isUploadingReport, setIsUploadingReport] = useState(false);
   const [deletingReportId, setDeletingReportId] = useState("");
   const [downloadingReportId, setDownloadingReportId] = useState("");
+  const [isExportingProfile, setIsExportingProfile] = useState(false);
 
   useEffect(() => {
     if (!childId) return;
@@ -239,6 +268,7 @@ export default function ChildDetailPage() {
 
     setIsSaving(true);
     setFormError("");
+    setPageError("");
 
     try {
       const payload = {
@@ -278,6 +308,7 @@ export default function ChildDetailPage() {
         `/children/profile/${profile._id}/update`,
         payload,
       );
+      if (!res.ok) throw new Error("Unable to save the profile.");
       const data = await res.json();
       setProfile((current) => ({
         ...(current || profile),
@@ -288,9 +319,14 @@ export default function ChildDetailPage() {
         queryKey: ["dashboard", "summary"],
       });
       setIsEditOpen(false);
+      toast({ title: "Child profile updated", description: "The child profile was updated successfully." });
     } catch (error) {
       console.error("Error saving child profile:", error);
       setFormError("Unable to save the profile. Please try again.");
+      setPageError(
+        error instanceof Error ? error.message : "Unable to save the profile.",
+      );
+      toast({ variant: "destructive", title: "Unable to save child profile", description: "Please try again." });
     } finally {
       setIsSaving(false);
     }
@@ -331,6 +367,7 @@ export default function ChildDetailPage() {
 
     setIsUploadingReport(true);
     setReportError("");
+    setPageError("");
     try {
       const upload = await uploadImageToCloudinary(reportFile);
       const response = await apiRequest(
@@ -355,6 +392,7 @@ export default function ChildDetailPage() {
       });
       setIsReportDialogOpen(false);
       resetReportDialog();
+      toast({ title: "Report card uploaded", description: "The report card was uploaded successfully." });
     } catch (error) {
       console.error("Error uploading report card:", error);
       setReportError(
@@ -362,6 +400,10 @@ export default function ChildDetailPage() {
           ? error.message
           : "Unable to upload report card.",
       );
+      setPageError(
+        error instanceof Error ? error.message : "Unable to upload report card.",
+      );
+      toast({ variant: "destructive", title: "Unable to upload report card", description: "Please try again." });
     } finally {
       setIsUploadingReport(false);
     }
@@ -373,6 +415,7 @@ export default function ChildDetailPage() {
       return;
 
     setDeletingReportId(reportCard._id);
+    setPageError("");
     try {
       const response = await apiRequest(
         "DELETE",
@@ -387,12 +430,17 @@ export default function ChildDetailPage() {
       await queryClient.invalidateQueries({
         queryKey: ["dashboard", "summary"],
       });
+      toast({ title: "Report card deleted", description: "The report card was deleted successfully." });
     } catch (error) {
       setReportError(
         error instanceof Error
           ? error.message
           : "Unable to delete report card.",
       );
+      setPageError(
+        error instanceof Error ? error.message : "Unable to delete report card.",
+      );
+      toast({ variant: "destructive", title: "Unable to delete report card", description: "Please try again." });
     } finally {
       setDeletingReportId("");
     }
@@ -471,12 +519,14 @@ export default function ChildDetailPage() {
 
     setIsUnlinking(true);
     setUnlinkError("");
+    setPageError("");
 
     try {
       const response = await apiRequest(
         "PATCH",
         `/sponsors/child/${childId}/unlink`,
       );
+      if (!response.ok) throw new Error("Unable to unlink this sponsor.");
       const data = await response.json();
 
       setProfile((current) =>
@@ -500,9 +550,14 @@ export default function ChildDetailPage() {
         ),
       );
       setIsUnlinkDialogOpen(false);
+      toast({ title: "Sponsor unlinked", description: "The sponsor was unlinked from this child." });
     } catch (error) {
       console.error("Error unlinking sponsor:", error);
       setUnlinkError("Unable to unlink this sponsor. Please try again.");
+      setPageError(
+        error instanceof Error ? error.message : "Unable to unlink this sponsor.",
+      );
+      toast({ variant: "destructive", title: "Unable to unlink sponsor", description: "Please try again." });
     } finally {
       setIsUnlinking(false);
     }
@@ -520,142 +575,309 @@ export default function ChildDetailPage() {
           .filter(Boolean)
       : [];
 
-  const exportChildProfilePdf = () => {
+  const exportChildProfilePdf = async () => {
     if (!profile) return;
 
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-    const margin = 14;
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    let y = 16;
+    setIsExportingProfile(true);
 
-    const ensureSpace = (height = 10) => {
-      if (y + height > pageHeight - 16) {
-        pdf.addPage();
-        y = 16;
-      }
-    };
-    const section = (title: string) => {
-      ensureSpace(14);
-      pdf.setFillColor(22, 101, 52);
-      pdf.rect(margin, y - 5, 182, 8, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(title, margin + 3, y);
-      pdf.setTextColor(30, 30, 30);
-      y += 9;
-    };
-    const field = (label: string, value: unknown) => {
-      const lines = pdf.splitTextToSize(
-        `${label}: ${String(value ?? "Not provided")}`,
-        182,
+    try {
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 16;
+      const contentWidth = pageWidth - margin * 2;
+      const footerY = pageHeight - 10;
+      const usableBottom = pageHeight - 18;
+      const colors = {
+        ink: [28, 36, 33] as [number, number, number],
+        muted: [102, 112, 107] as [number, number, number],
+        accent: [47, 112, 94] as [number, number, number],
+        pale: [241, 245, 242] as [number, number, number],
+        line: [218, 225, 220] as [number, number, number],
+      };
+      const displayValue = (item: unknown) => {
+        const text = String(item ?? "").trim();
+        return text || "Not provided";
+      };
+      const fullName = displayValue(
+        [profile.firstName, profile.secondName, profile.givenName]
+          .filter(Boolean)
+          .join(" "),
       );
-      ensureSpace(lines.length * 4 + 3);
+      const sponsorName = sponsorProfile?.profile?.fullName || sponsorProfile?.sponsor?.name;
+      let cursor = margin;
+
+      const setText = (color = colors.ink) => pdf.setTextColor(...color);
+      const addFooter = () => {
+        pdf.setDrawColor(...colors.line);
+        pdf.setLineWidth(0.2);
+        pdf.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+        setText(colors.muted);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7.5);
+        pdf.text("Confidential child profile", margin, footerY);
+        pdf.text(`Page ${pdf.getNumberOfPages()}`, pageWidth - margin, footerY, {
+          align: "right",
+        });
+      };
+      const startPage = (title?: string) => {
+        if (pdf.getNumberOfPages() > 0) addFooter();
+        pdf.addPage();
+        cursor = margin;
+        if (title) {
+          setText(colors.ink);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(18);
+          pdf.text(title, margin, cursor + 4);
+          cursor += 14;
+        }
+      };
+      const ensureSpace = (height: number, title = "Child Profile") => {
+        if (cursor + height > usableBottom) startPage(title);
+      };
+      const addSection = (title: string) => {
+        ensureSpace(17, title);
+        cursor += 4;
+        setText(colors.accent);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(13);
+        pdf.text(title.toUpperCase(), margin, cursor);
+        pdf.setDrawColor(...colors.accent);
+        pdf.setLineWidth(0.8);
+        pdf.line(margin, cursor + 4, pageWidth - margin, cursor + 4);
+        cursor += 12;
+      };
+      const addRow = (label: string, item: unknown, width = contentWidth) => {
+        const text = displayValue(item);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        const lines = pdf.splitTextToSize(text, width - 42);
+        ensureSpace(Math.max(9, lines.length * 4 + 6));
+        setText(colors.muted);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(label.toUpperCase(), margin, cursor);
+        setText(colors.ink);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(lines, margin + 42, cursor);
+        cursor += Math.max(9, lines.length * 4 + 4);
+      };
+      const addTwoColumnRows = (rows: Array<[string, unknown]>) => {
+        for (let index = 0; index < rows.length; index += 2) {
+          ensureSpace(11);
+          const columnWidth = contentWidth / 2 - 5;
+          const draw = (row: [string, unknown], x: number) => {
+            const [label, item] = row;
+            setText(colors.muted);
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(7.5);
+            pdf.text(label.toUpperCase(), x, cursor);
+            setText(colors.ink);
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(9);
+            pdf.text(pdf.splitTextToSize(displayValue(item), columnWidth), x, cursor + 5);
+          };
+          draw(rows[index], margin);
+          if (rows[index + 1]) draw(rows[index + 1], margin + contentWidth / 2 + 5);
+          cursor += 14;
+        }
+      };
+      const addParagraph = (label: string, item: unknown) => {
+        const lines = pdf.splitTextToSize(displayValue(item), contentWidth);
+        ensureSpace(10 + lines.length * 4.2);
+        setText(colors.muted);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8);
+        pdf.text(label.toUpperCase(), margin, cursor);
+        cursor += 5;
+        setText(colors.ink);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9.5);
+        pdf.text(lines, margin, cursor);
+        cursor += lines.length * 4.2 + 5;
+      };
+      const addImageFrame = async (
+        url: string | undefined,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+      ) => {
+        pdf.setFillColor(...colors.pale);
+        pdf.roundedRect(x, y, width, height, 2, 2, "F");
+        if (!url) {
+          setText(colors.muted);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9);
+          pdf.text("Image not available", x + width / 2, y + height / 2, {
+            align: "center",
+          });
+          return;
+        }
+        const image = await loadPdfImage(url);
+        const scale = Math.min(width / image.width, height / image.height);
+        const imageWidth = image.width * scale;
+        const imageHeight = image.height * scale;
+        pdf.addImage(
+          image.dataUrl,
+          image.format,
+          x + (width - imageWidth) / 2,
+          y + (height - imageHeight) / 2,
+          imageWidth,
+          imageHeight,
+        );
+      };
+
+      pdf.deletePage(1);
+      startPage();
+      const logo = await loadPdfImage("/dark-logo.jpeg");
+      const logoSize = 9;
+      const logoScale = Math.min(logoSize / logo.width, logoSize / logo.height);
+      const logoWidth = logo.width * logoScale;
+      const logoHeight = logo.height * logoScale;
+      pdf.addImage(
+        logo.dataUrl,
+        logo.format,
+        margin,
+        cursor - 5,
+        logoWidth,
+        logoHeight,
+      );
+      setText(colors.accent);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.text("ENSIGO OF LOVE FOUNDATION", margin + logoSize + 3, cursor);
+      setText(colors.muted);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.text(new Date().toLocaleDateString(), pageWidth - margin, cursor, {
+        align: "right",
+      });
+      cursor += 12;
+      setText(colors.ink);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(24);
+      pdf.text("PROFILE & BIO", margin, cursor);
+      cursor += 8;
+      setText(colors.muted);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(9);
-      pdf.text(lines, margin, y);
-      y += lines.length * 4 + 2;
-    };
+      pdf.text("A detailed child profile for care, education, and sponsorship planning.", margin, cursor);
+      cursor += 10;
 
-    pdf.setTextColor(22, 101, 52);
-    pdf.setFontSize(18);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Child Profile Report", margin, y);
-    y += 8;
-    pdf.setTextColor(80, 80, 80);
-    pdf.setFontSize(9);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(
-      `Child ID: ${profile._id} | Generated: ${new Date().toLocaleString()}`,
-      margin,
-      y,
-    );
-    y += 10;
+      const imageTop = cursor;
+      const imageWidth = 62;
+      const imageHeight = 68;
+      await addImageFrame(profile.image?.url, margin, imageTop, imageWidth, imageHeight);
+      const detailsX = margin + imageWidth + 12;
+      const detailsWidth = contentWidth - imageWidth - 12;
+      const summaryRows: Array<[string, unknown]> = [
+        ["Name", fullName],
+        ["Gender", profile.gender],
+        ["Age", profile.age],
+        ["Date of birth", formatDisplayDate(profile.dateOfBirth)],
+        ["Nationality", profile.nationality],
+        ["Location", profile.location],
+      ];
+      summaryRows.forEach(([label, item]) => {
+        setText(colors.muted);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7.5);
+        pdf.text(label.toUpperCase(), detailsX, cursor);
+        setText(colors.ink);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.text(pdf.splitTextToSize(displayValue(item), detailsWidth), detailsX, cursor + 5);
+        cursor += 10;
+      });
+      cursor = imageTop + imageHeight + 10;
+      addParagraph("Biography", profile.background);
+      addParagraph("Current needs", needsList.join(", "));
 
-    section("Identity and Personal Details");
-    field("Profile ID", profile._id);
-    field(
-      "Name",
-      [profile.firstName, profile.secondName, profile.givenName]
-        .filter(Boolean)
-        .join(" "),
-    );
-    field("Gender", profile.gender);
-    field("Date of birth", formatDisplayDate(profile.dateOfBirth));
-    field(
-      "Age / age group",
-      `${profile.age || "Not provided"} / ${profile.ageGroup || "Not provided"}`,
-    );
-    field("Nationality", profile.nationality);
-    field("Class", profile.class);
-    field("School", profile.school);
-    field("Location", profile.location);
+      addSection("Family");
+      addTwoColumnRows([
+        ["Family status", profile.familyStatus],
+        ["Number of parents", profile.numberOfParents],
+        ["Guardian", profile.guardianName],
+        ["Relationship", profile.guardianRelation],
+        ["Contact", profile.guardianContact],
+      ]);
 
-    section("Family and Guardian Details");
-    field("Family status", profile.familyStatus);
-    field("Number of parents", profile.numberOfParents);
-    field("Guardian", profile.guardianName);
-    field("Guardian contact", profile.guardianContact);
-    field("Guardian relation", profile.guardianRelation);
-    field("Background", profile.background);
-    field("Needs", needsList.join(", "));
+      addSection("Education");
+      addTwoColumnRows([
+        ["School", profile.school],
+        ["Class", profile.class],
+        ["Current level", education.currentLevel],
+        ["Academic year", education.academicYear],
+        ["Study status", education.isStudying ? "Currently studying" : "Not provided"],
+        ["Graduation target", education.graduationTarget || education.estimatedGraduationYear],
+      ]);
+      addParagraph("Education notes", education.educationNotes);
 
-    section("Education Details");
-    field("Current level", education.currentLevel);
-    field("Current class", education.currentClass);
-    field("Academic year", education.academicYear);
-    field("Last term result", education.lastTermResult);
-    field("Graduation target", education.graduationTarget);
-    field("Estimated graduation", education.estimatedGraduationYear);
-    field("Education notes", education.educationNotes);
-
-    section("Current Sponsorship");
-    field("Status", profile.sponsorshipStatus);
-    field("Sponsor ID", sponsorProfile?._id);
-    field("Monthly need", profile.monthlyNeed);
-
-    section("Sponsorship and Payment History");
-    if (history.length > 0) {
-      history.forEach((record: any) => {
-        field(
-          "Sponsorship",
-          `${record._id || ""} | Sponsor ID: ${record.donor?._id || record.donor || sponsorProfile?._id || ""}`,
-        );
-        field(
-          "Status / amount",
-          `${record.status || ""} / ${record.amount || ""} ${record.frequency || ""}`,
-        );
-        (record.payments || []).forEach((payment: any) => {
-          field(
-            "Payment",
-            `${payment._id || ""} | ${payment.date ? formatDisplayDate(payment.date) : ""} | ${payment.amount || 0} ${payment.currency || "UGX"} | ${payment.method || ""} | ${payment.transactionId || ""} | Group: ${payment.paymentGroupId || ""}`,
+      addSection("Sponsor Details");
+      addTwoColumnRows([
+        ["Sponsorship status", profile.sponsorshipStatus],
+        ["Sponsor", sponsorName],
+        ["Monthly need", profile.monthlyNeed],
+        ["Sponsorship records", history.length],
+      ]);
+      if (history.length) {
+        history.forEach((record: any) => {
+          addRow(
+            "Plan",
+            `${displayValue(record.status)} | ${displayValue(record.amount)} | ${displayValue(record.frequency)}`,
           );
+          (record.payments || []).forEach((payment: any) => {
+            addRow(
+              "Payment",
+              `${formatDisplayDate(payment.date)} | ${displayValue(payment.amount)} ${displayValue(payment.currency || "UGX")} | ${displayValue(payment.method)}`,
+            );
+          });
         });
-      });
-    } else {
-      field("History", "No sponsorship history available");
-    }
+      } else {
+        addParagraph("Payment history", "No sponsorship history available.");
+      }
+      addFooter();
 
-    section("Report Cards and Documents");
-    if (reportCards.length > 0) {
-      reportCards.forEach((card: any) => {
-        field(
-          "Report card",
-          `${card._id || ""} | ${card.name || "Report card"} | ${card.fileType || ""} | ${card.uploadedAt ? formatDisplayDate(card.uploadedAt) : ""} | ${card.url || ""}`,
-        );
-      });
-    } else {
-      field("Documents", "No report cards uploaded");
+      if (reportCards.length === 0) {
+        startPage("REPORT CARDS");
+        setText(colors.muted);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(10);
+        pdf.text("No report cards have been uploaded for this child.", margin, cursor);
+      } else {
+        for (const card of reportCards) {
+          startPage("REPORT CARDS");
+          setText(colors.ink);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(13);
+          pdf.text(displayValue(card.name), margin, cursor);
+          cursor += 6;
+          setText(colors.muted);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(8);
+          pdf.text(
+            `Uploaded ${card.uploadedAt ? formatDisplayDate(card.uploadedAt) : "date not provided"}`,
+            margin,
+            cursor,
+          );
+          cursor += 8;
+          if (String(card.fileType || "").toLowerCase().includes("pdf")) {
+            pdf.setFontSize(10);
+            pdf.text("This report card is available as a separate PDF document in the dashboard.", margin, cursor);
+          } else {
+            await addImageFrame(card.url, margin, cursor, contentWidth, pageHeight - cursor - 28);
+          }
+        }
+      }
+      addFooter();
+      pdf.save(`child-profile-${profile._id}.pdf`);
+    } catch (error) {
+      setReportError(
+        error instanceof Error ? error.message : "Unable to export child profile PDF.",
+      );
+    } finally {
+      setIsExportingProfile(false);
     }
-
-    pdf.setFontSize(8);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text("Confidential administrative report", margin, pageHeight - 8);
-    pdf.save(`child-profile-${profile._id}.pdf`);
   };
 
   if (loading) {
@@ -702,10 +924,11 @@ export default function ChildDetailPage() {
       </Button>
       <Button
         className="absolute top-18 right-8"
-        onClick={exportChildProfilePdf}
+        onClick={() => void exportChildProfilePdf()}
+        disabled={isExportingProfile}
       >
         <Download className="mr-2 size-4" />
-        Export profile
+        {isExportingProfile ? "Preparing PDF..." : "Export profile"}
       </Button>
 
       <div className="mt-2 grid gap-6 lg:grid-cols-[320px_1fr]">
@@ -1327,7 +1550,7 @@ export default function ChildDetailPage() {
                         key={
                           card._id || card.public_id || `${card.name}-${index}`
                         }
-                        className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-muted shadow-sm"
+                        className="group relative aspect-4/3 overflow-hidden rounded-xl border border-border bg-muted shadow-sm"
                       >
                         <img
                           src={card.url}
@@ -1402,7 +1625,7 @@ export default function ChildDetailPage() {
           }
         }}
       >
-        <DialogContent className="bg-card">
+        <DialogContent preventDismiss className="bg-card">
           <DialogHeader>
             <DialogTitle>Upload report card</DialogTitle>
           </DialogHeader>
@@ -1491,7 +1714,10 @@ export default function ChildDetailPage() {
       </Dialog>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-h-[90vh] bg-card overflow-y-auto max-w-3xl">
+        <DialogContent
+          preventDismiss
+          className="max-h-[90vh] bg-card overflow-y-auto max-w-3xl"
+        >
           <DialogHeader>
             <DialogTitle>Edit child profile</DialogTitle>
           </DialogHeader>
@@ -1744,6 +1970,7 @@ export default function ChildDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ServerError message={pageError} />
     </div>
   );
 }

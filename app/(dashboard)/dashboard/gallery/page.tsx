@@ -34,6 +34,7 @@ import { set } from "react-hook-form";
 import { url } from "inspector";
 import { apiRequest } from "@/lib/query-client";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 
 interface GalleryImage {
   _id: string;
@@ -205,9 +206,13 @@ export default function GalleryPage() {
             image._id === id ? { ...image, ...editData } : image,
           ),
         );
+        toast({ title: "Image updated", description: "The gallery image was updated successfully." });
+      } else {
+        throw new Error("Failed to update gallery image");
       }
     } catch (error) {
-      console.log(error);
+      console.error("Error updating image:", error);
+      toast({ variant: "destructive", title: "Unable to update image", description: "Please try again." });
     }
     setEditingId(null);
     setEditData({});
@@ -222,10 +227,13 @@ export default function GalleryPage() {
   const handleDelete = async (id: string) => {
     setDeletingId(id);
     try {
-      await apiRequest("DELETE", `/gallery/${id}/delete`);
+      const response = await apiRequest("DELETE", `/gallery/${id}/delete`);
+      if (!response.ok) throw new Error("Failed to delete gallery image");
       setImages(images.filter((image) => image._id !== id));
+      toast({ title: "Image deleted", description: "The gallery image was deleted successfully." });
     } catch (error) {
       console.error("Error deleting image:", error);
+      toast({ variant: "destructive", title: "Unable to delete image", description: "Please try again." });
     } finally {
       setDeletingId(null);
     }
@@ -273,10 +281,15 @@ export default function GalleryPage() {
       if (res.ok) {
         const data = await res.json();
         setImages([...images, data?.newGalleryItem]);
+      } else {
+        throw new Error("Failed to create gallery image");
       }
       resetNewImageForm();
       setShowAddDialog(false);
+      toast({ title: "Image uploaded", description: "The gallery image was added successfully." });
     } catch (error) {
+      console.error("Error uploading image:", error);
+      toast({ variant: "destructive", title: "Unable to upload image", description: "Please try again." });
     } finally {
       setSaving(false);
     }
@@ -396,7 +409,7 @@ export default function GalleryPage() {
 
       {/* Add Image Dialog */}
       <Dialog open={showAddDialog} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="w-full bg-card max-w-xl">
+        <DialogContent preventDismiss className="w-full bg-card max-w-xl">
           <DialogHeader>
             <DialogTitle>Upload Gallery Image</DialogTitle>
             <DialogDescription>
@@ -538,7 +551,7 @@ export default function GalleryPage() {
 
       {/* Edit Image Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="w-full max-w-2xl">
+        <DialogContent preventDismiss className="w-full max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Image</DialogTitle>
             <DialogDescription>

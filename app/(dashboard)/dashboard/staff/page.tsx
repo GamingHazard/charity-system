@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -260,9 +261,11 @@ export default function StaffPage() {
       };
 
       if (editData && editData._id) {
-        await apiRequest("PUT", `/staff/update/${editData._id}`, newMember);
+        const response = await apiRequest("PUT", `/staff/update/${editData._id}`, newMember);
+        if (!response.ok) throw new Error("Failed to update staff member");
       } else {
-        await apiRequest("POST", "/staff/new", newMember);
+        const response = await apiRequest("POST", "/staff/new", newMember);
+        if (!response.ok) throw new Error("Failed to create staff member");
       }
 
       setStaff((prev: any) => {
@@ -277,7 +280,15 @@ export default function StaffPage() {
       removeImage();
       resetNewMemberForm();
       setShowAddForm(false);
+      toast({
+        title: editData?._id ? "Staff member updated" : "Staff member created",
+        description: editData?._id
+          ? "The staff member was updated successfully."
+          : "The staff member was created successfully.",
+      });
     } catch (error) {
+      console.error("Error saving staff member:", error);
+      toast({ variant: "destructive", title: "Unable to save staff member", description: "Please try again." });
     } finally {
       setSaving(false);
     }
@@ -480,7 +491,7 @@ export default function StaffPage() {
       {/* staff and volunteer form */}
       {activeTab !== "subscribers" && (
         <Dialog open={showAddForm} onOpenChange={handleDialogOpenChange}>
-          <DialogContent className="w-full bg-card max-w-xl">
+          <DialogContent preventDismiss className="w-full bg-card max-w-xl">
             <DialogHeader>
               {editData && editData._id ? (
                 <DialogTitle>
@@ -1022,7 +1033,7 @@ export default function StaffPage() {
           }
         }}
       >
-        <DialogContent className="w-full bg-card max-w-md">
+        <DialogContent preventDismiss className="w-full bg-card max-w-md">
           <DialogHeader>
             <DialogTitle>Add Social Link</DialogTitle>
             <DialogDescription>

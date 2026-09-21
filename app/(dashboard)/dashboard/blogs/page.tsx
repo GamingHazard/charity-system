@@ -40,6 +40,7 @@ import { apiRequest } from "@/lib/query-client";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { url } from "inspector";
+import { toast } from "@/hooks/use-toast";
 
 interface Comment {
   id: string;
@@ -198,9 +199,13 @@ export default function BlogsPage() {
     try {
       setSaving(true);
 
-      await apiRequest("DELETE", `/blogs/delete/${id}`);
+      const response = await apiRequest("DELETE", `/blogs/delete/${id}`);
+      if (!response.ok) throw new Error("Failed to delete blog post");
       setBlogs(blogs.filter((blog) => blog._id !== id));
+      toast({ title: "Blog post deleted", description: "The blog post was deleted successfully." });
     } catch (error) {
+      console.error("Error deleting blog post:", error);
+      toast({ variant: "destructive", title: "Unable to delete blog post", description: "Please try again." });
     } finally {
       setSaving(false);
     }
@@ -228,11 +233,15 @@ export default function BlogsPage() {
             blog._id === id ? { ...blog, featured: !blog.featured } : blog,
           ),
         );
+        toast({ title: "Featured status updated", description: "The blog post's featured status was updated." });
+      } else {
+        throw new Error("Failed to update featured status");
       }
 
       setOpenMenuId(null);
     } catch (error) {
-      console.log(error);
+      console.error("Error updating featured status:", error);
+      toast({ variant: "destructive", title: "Unable to update featured status", description: "Please try again." });
     }
   };
 
@@ -246,9 +255,13 @@ export default function BlogsPage() {
             blog._id === id ? { ...blog, status: "published" } : blog,
           ),
         );
+        toast({ title: "Blog post published", description: "The blog post was published successfully." });
+      } else {
+        throw new Error("Failed to publish blog post");
       }
     } catch (error) {
-      console.log(error);
+      console.error("Error publishing blog post:", error);
+      toast({ variant: "destructive", title: "Unable to publish blog post", description: "Please try again." });
     } finally {
       setOpenMenuId(null);
     }
@@ -312,16 +325,25 @@ export default function BlogsPage() {
       };
 
       if (editData && editData._id) {
-        apiRequest("PUT", `/blogs/${editData._id}/update`, payLoad);
+        const response = await apiRequest("PUT", `/blogs/${editData._id}/update`, payLoad);
+        if (!response.ok) throw new Error("Failed to update blog post");
       } else {
-        await apiRequest("POST", "/blogs/new", payLoad);
+        const response = await apiRequest("POST", "/blogs/new", payLoad);
+        if (!response.ok) throw new Error("Failed to create blog post");
       }
 
       resetNewBlogForm();
       setShowAddDialog(false);
+      toast({
+        title: editData?._id ? "Blog post updated" : "Blog post created",
+        description: editData?._id
+          ? "The blog post was updated successfully."
+          : "The blog post was created successfully.",
+      });
     } catch (error) {
       setSaving(false);
       console.error("Error uploading image:", error);
+      toast({ variant: "destructive", title: "Unable to save blog post", description: "Please try again." });
     } finally {
       setSaving(false);
     }
@@ -447,7 +469,10 @@ export default function BlogsPage() {
 
       {/* Add Blog Dialog */}
       <Dialog open={showAddDialog} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="w-full  max-h-160 overflow-y-auto bg-card max-w-2xl">
+        <DialogContent
+          preventDismiss
+          className="w-full  max-h-160 overflow-y-auto bg-card max-w-2xl"
+        >
           <DialogHeader>
             <DialogTitle>Create New Blog Post</DialogTitle>
             <DialogDescription>

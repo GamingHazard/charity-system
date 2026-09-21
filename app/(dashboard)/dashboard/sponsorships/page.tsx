@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,13 +41,11 @@ import {
   Plus,
   Archive,
 } from "lucide-react";
-import {
-  mockSponsorshipRecords,
-  PaymentRecord,
-  SponsorshipRecord,
-} from "@/lib/mock-data";
+import type { PaymentRecord, SponsorshipRecord } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
+import { toast } from "@/hooks/use-toast";
+import { ServerError } from "@/components/ui/server-error";
 
 type SponsorshipStatus = SponsorshipRecord["status"];
 type PaymentStatus = PaymentRecord["status"];
@@ -135,6 +133,9 @@ const initialSponsorForm: SponsorForm = {
   startDate: new Date().toISOString().slice(0, 10),
 };
 
+const emptyChildren: any[] = [];
+const emptySponsorshipRecords: SponsorshipRecord[] = [];
+
 function getStatusClasses(status: SponsorshipStatus | string) {
   switch (status) {
     case "Active":
@@ -158,15 +159,18 @@ export default function SponsorshipsDashboard() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: sponsorships, isLoading } = useQuery<SponsorProfile[]>({
-    queryKey: ["sponsors", "profile", "all"],
+    queryKey: ["sponsors", "profiles", "all"],
   });
-  const { data: childrenData = [] } = useQuery<any[]>({
+  const { data: childrenData = emptyChildren } = useQuery<any[]>({
     queryKey: ["children", "profiles"],
   });
+  const { data: sponsorshipRecords = emptySponsorshipRecords } = useQuery<
+    SponsorshipRecord[]
+  >({
+    queryKey: ["sponsors", "sponsorship", "records"],
+  });
 
-  const [records, setRecords] = useState<SponsorshipRecord[]>(
-    mockSponsorshipRecords,
-  );
+  const [records, setRecords] = useState<SponsorshipRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     "all" | "Complete" | "Incomplete"
@@ -192,6 +196,7 @@ export default function SponsorshipsDashboard() {
   const [isArchiving, setIsArchiving] = useState(false);
   const [archiveError, setArchiveError] = useState("");
   const [sponsorFormError, setSponsorFormError] = useState("");
+  const [pageError, setPageError] = useState("");
   const [paymentForm, setPaymentForm] = useState(initialPayment);
   const [sponsorForm, setSponsorForm] =
     useState<SponsorForm>(initialSponsorForm);
@@ -200,6 +205,10 @@ export default function SponsorshipsDashboard() {
     () => (Array.isArray(sponsorships) ? sponsorships : []),
     [sponsorships],
   );
+
+  useEffect(() => {
+    setRecords(Array.isArray(sponsorshipRecords) ? sponsorshipRecords : []);
+  }, [sponsorshipRecords]);
 
   const filteredRecords = useMemo(() => {
     return sponsorProfiles.filter((profile) => {
@@ -262,6 +271,7 @@ export default function SponsorshipsDashboard() {
   const handleUpdateProfile = async () => {
     const sponsorId = selectedSponsorProfile?._id || selectedRecord?.donor?._id;
     if (!sponsorId) return;
+    setPageError("");
 
     try {
       const response = await apiRequest(
@@ -288,10 +298,19 @@ export default function SponsorshipsDashboard() {
       setSelectedSponsorProfile(result.sponsor);
       setIsEditProfileOpen(false);
       await queryClient.invalidateQueries({
-        queryKey: ["sponsors", "profile", "all"],
+        queryKey: ["sponsors", "profiles", "all"],
+      });
+      toast({
+        title: "Sponsor profile updated",
+        description: "The sponsor profile was updated successfully.",
       });
     } catch (error) {
       console.error("Error updating sponsor profile:", error);
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : "Failed to update sponsor profile.",
+      );
       setSponsorFormError(
         "Failed to update sponsor profile. Please try again.",
       );
@@ -319,6 +338,7 @@ export default function SponsorshipsDashboard() {
 
     setSponsorSubmitting(true);
     setSponsorFormError("");
+    setPageError("");
 
     try {
       const payload = {
@@ -363,7 +383,7 @@ export default function SponsorshipsDashboard() {
       }
 
       await queryClient.invalidateQueries({
-        queryKey: ["sponsors", "profile", "all"],
+        queryKey: ["sponsors", "profiles", "all"],
       });
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],
@@ -371,8 +391,17 @@ export default function SponsorshipsDashboard() {
 
       setIsCreateDialogOpen(false);
       resetSponsorForm();
+      toast({
+        title: "Sponsor profile created",
+        description: "The sponsor profile was created successfully.",
+      });
     } catch (error) {
       console.error("Error creating sponsor profile:", error);
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : "Failed to create sponsor profile.",
+      );
       setSponsorFormError(
         "Failed to create sponsor profile. Please try again.",
       );
@@ -386,20 +415,39 @@ export default function SponsorshipsDashboard() {
 
     setIsArchiving(true);
     setArchiveError("");
+    setPageError("");
     try {
-      await apiRequest("DELETE", `/sponsors/profile/${archiveTarget._id}`);
+      const response = await apiRequest(
+        "DELETE",
+        `/sponsors/profile/${archiveTarget._id}`,
+      );
+      if (!response.ok) throw new Error("Failed to archive sponsor profile");
       await queryClient.invalidateQueries({
-        queryKey: ["sponsors", "profile", "all"],
+        queryKey: ["sponsors", "profiles", "all"],
       });
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],
       });
       setArchiveTarget(null);
+      toast({
+        title: "Sponsor profile archived",
+        description: "The sponsor profile was archived successfully.",
+      });
     } catch (error) {
       console.error("Error archiving sponsor profile:", error);
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : "Unable to archive this sponsor profile.",
+      );
       setArchiveError(
         "Unable to archive this sponsor profile. Please try again.",
       );
+      toast({
+        variant: "destructive",
+        title: "Unable to archive sponsor profile",
+        description: "Please try again.",
+      });
     } finally {
       setIsArchiving(false);
     }
@@ -407,6 +455,7 @@ export default function SponsorshipsDashboard() {
 
   const handleUpdateStatus = async (status: SponsorshipStatus) => {
     if (!selectedRecord) return;
+    setPageError("");
 
     try {
       const res = await apiRequest(
@@ -427,13 +476,27 @@ export default function SponsorshipsDashboard() {
         ),
       );
       await queryClient.invalidateQueries({
-        queryKey: ["sponsors", "profile", "all"],
+        queryKey: ["sponsors", "profiles", "all"],
       });
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],
       });
+      toast({
+        title: "Sponsorship status updated",
+        description: "The sponsorship status was updated successfully.",
+      });
     } catch (error) {
       console.error("Error updating sponsorship status:", error);
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : "Failed to update sponsorship status.",
+      );
+      toast({
+        variant: "destructive",
+        title: "Unable to update sponsorship status",
+        description: "Please try again.",
+      });
     }
   };
 
@@ -443,6 +506,7 @@ export default function SponsorshipsDashboard() {
     }
 
     setLoading(true);
+  setPageError("");
     try {
       const amountValue = Number(paymentForm.amount);
       if (isNaN(amountValue) || amountValue <= 0) {
@@ -503,14 +567,26 @@ export default function SponsorshipsDashboard() {
         ),
       );
       await queryClient.invalidateQueries({
-        queryKey: ["sponsors", "profile", "all"],
+        queryKey: ["sponsors", "profiles", "all"],
       });
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],
       });
       setPaymentForm(initialPayment);
+      toast({
+        title: "Payment recorded",
+        description: "The sponsorship payment was recorded successfully.",
+      });
     } catch (error) {
       console.error("Error adding payment:", error);
+      setPageError(
+        error instanceof Error ? error.message : "Failed to add payment.",
+      );
+      toast({
+        variant: "destructive",
+        title: "Unable to record payment",
+        description: "Please check the payment details and try again.",
+      });
     } finally {
       setLoading(false);
     }
@@ -684,7 +760,7 @@ export default function SponsorshipsDashboard() {
                   }
                 >
                   <SelectTrigger id="statusFilter">
-                    <SelectValue>{statusFilter}</SelectValue>
+                    <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All</SelectItem>
@@ -849,7 +925,7 @@ export default function SponsorshipsDashboard() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent preventDismiss>
           <DialogHeader>
             <DialogTitle>Archive sponsor profile?</DialogTitle>
             <DialogDescription>
@@ -884,7 +960,7 @@ export default function SponsorshipsDashboard() {
       </Dialog>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent preventDismiss className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create sponsor profile</DialogTitle>
             <DialogDescription>
@@ -1505,7 +1581,7 @@ export default function SponsorshipsDashboard() {
                           onValueChange={handleUpdateStatus}
                         >
                           <SelectTrigger id="recordStatus" className="w-full">
-                            <SelectValue>{selectedRecord.status}</SelectValue>
+                            <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Active">Active</SelectItem>
@@ -1600,7 +1676,7 @@ export default function SponsorshipsDashboard() {
                           }
                         >
                           <SelectTrigger id="paymentMethod" className="w-full ">
-                            <SelectValue>{paymentForm.method}</SelectValue>
+                            <SelectValue placeholder="Select method" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Zelle">Zelle</SelectItem>
@@ -1667,6 +1743,7 @@ export default function SponsorshipsDashboard() {
           )}
         </DialogContent>
       </Dialog>
+      <ServerError message={pageError} />
     </div>
   );
 }

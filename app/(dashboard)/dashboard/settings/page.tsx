@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -28,6 +29,7 @@ export default function SettingsPage() {
     await new Promise(resolve => setTimeout(resolve, 500));
     setIsSaving(false);
     setIsEditing(false);
+    toast({ title: 'Settings saved', description: 'Organization settings were updated successfully.' });
   };
 
   return (

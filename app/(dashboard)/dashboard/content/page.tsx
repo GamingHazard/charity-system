@@ -8,6 +8,7 @@ import { ContentItemCard } from '@/components/dashboard/content-item-card';
 import { ContentStats } from '@/components/dashboard/content-stats';
 import { ContentItem, defaultContentItems, normalizeContentItem, searchContent as filterContent, sortContent } from '@/lib/content-utils';
 import { apiRequest } from '@/lib/query-client';
+import { toast } from '@/hooks/use-toast';
 
 const initialContent: ContentItem[] = defaultContentItems;
 
@@ -56,12 +57,15 @@ export default function ContentPage() {
     if (!item) return;
     try {
       const response = await apiRequest('PUT', `/content/${id}`, { ...item, content: editContent, status: 'published' });
+      if (!response.ok) throw new Error('Unable to save content item.');
       const updated = normalizeContentItem(await response.json());
       setContent((items) => items.map((entry) => entry.id === id ? updated : entry));
       setEditingId(null);
       setEditContent('');
+      toast({ title: 'Content updated', description: 'The content item was saved successfully.' });
     } catch {
       setError('Unable to save this content item.');
+      toast({ variant: 'destructive', title: 'Unable to save content', description: 'Please try again.' });
     }
   };
 
@@ -72,10 +76,13 @@ export default function ContentPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await apiRequest('DELETE', `/content/${id}`);
+      const response = await apiRequest('DELETE', `/content/${id}`);
+      if (!response.ok) throw new Error('Unable to delete content item.');
       setContent((items) => items.filter((item) => item.id !== id));
+      toast({ title: 'Content deleted', description: 'The content item was deleted successfully.' });
     } catch {
       setError('Unable to delete this content item.');
+      toast({ variant: 'destructive', title: 'Unable to delete content', description: 'Please try again.' });
     }
   };
 
@@ -84,10 +91,13 @@ export default function ContentPage() {
     if (!item) return;
     try {
       const response = await apiRequest('PUT', `/content/${id}`, { ...item, status: newStatus });
+      if (!response.ok) throw new Error('Unable to update publication status.');
       const updated = normalizeContentItem(await response.json());
       setContent((items) => items.map((entry) => entry.id === id ? updated : entry));
+      toast({ title: 'Publication status updated', description: 'The content status was updated successfully.' });
     } catch {
       setError('Unable to update publication status.');
+      toast({ variant: 'destructive', title: 'Unable to update status', description: 'Please try again.' });
     }
   };
 
@@ -102,9 +112,18 @@ export default function ContentPage() {
       status: 'draft',
     };
     apiRequest('POST', '/content', newItem)
-      .then((response) => response.json())
-      .then((item) => setContent((items) => [...items, normalizeContentItem(item)]))
-      .catch(() => setError('Unable to create a content item.'));
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Unable to create a content item.');
+        return response.json();
+      })
+      .then((item) => {
+        setContent((items) => [...items, normalizeContentItem(item)]);
+        toast({ title: 'Content created', description: 'The content item was created successfully.' });
+      })
+      .catch(() => {
+        setError('Unable to create a content item.');
+        toast({ variant: 'destructive', title: 'Unable to create content', description: 'Please try again.' });
+      });
   };
 
   return (

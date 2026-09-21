@@ -47,12 +47,62 @@ axiosClient.interceptors.request.use((config) => {
   return config;
 });
 
-// ✅ Throws error if response is not OK
-async function throwIfResNotOk(res: Response) {
-  if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+const MAX_SERVER_ERROR_LENGTH = 300;
+
+function getServerErrorMessage(payload: unknown, fallback: string) {
+  const messages: string[] = [];
+
+  if (typeof payload === "string" && payload.trim()) {
+    messages.push(payload.trim());
+  } else if (payload && typeof payload === "object") {
+    const data = payload as Record<string, unknown>;
+
+    if (typeof data.message === "string" && data.message.trim()) {
+      messages.push(data.message.trim());
+    } else if (typeof data.error === "string" && data.error.trim()) {
+      messages.push(data.error.trim());
+    } else if (Array.isArray(data.errors)) {
+      messages.push(
+        ...data.errors
+          .map((item) => {
+            if (typeof item === "string") return item.trim();
+            if (item && typeof item === "object") {
+              const message = (item as Record<string, unknown>).message;
+              return typeof message === "string" ? message.trim() : "";
+            }
+            return "";
+          })
+          .filter(Boolean),
+      );
+    }
   }
+
+  const message = messages.join(", ");
+  if (!message || /<[^>]*>/.test(message)) {
+    return fallback || "Something went wrong. Please try again.";
+  }
+
+  return message.slice(0, MAX_SERVER_ERROR_LENGTH);
+}
+
+// Throws a safe, user-facing message if the response is not OK.
+async function throwIfResNotOk(res: Response) {
+  if (res.ok) return;
+
+  const contentType = res.headers.get("content-type") || "";
+  let payload: unknown = null;
+
+  if (contentType.includes("application/json")) {
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+  } else {
+    payload = await res.text().catch(() => "");
+  }
+
+  throw new Error(getServerErrorMessage(payload, res.statusText));
 }
 
 // ✅ Handles POST / PUT / PATCH / DELETE

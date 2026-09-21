@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/hooks/use-toast';
 
 interface Program {
   id: number;
@@ -55,11 +56,13 @@ export default function ProgramsPage() {
       setPrograms([...programs, newProgram]);
       setFormData({ title: '', description: '', impact: '' });
       setShowForm(false);
+      toast({ title: 'Program created', description: 'The program was added successfully.' });
     }
   };
 
   const handleDeleteProgram = (id: number) => {
     setPrograms(programs.filter(p => p.id !== id));
+    toast({ title: 'Program deleted', description: 'The program was removed successfully.' });
   };
 
   const getStatusColor = (status: string) => {
