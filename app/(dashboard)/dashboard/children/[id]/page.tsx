@@ -1269,9 +1269,9 @@ export default function ChildDetailPage() {
                 <p className="text-xs uppercase tracking-wide text-foreground/60">
                   Last term result
                 </p>
-                <p className="mt-2 text-base font-semibold text-foreground">
+                {/* <p className="mt-2 text-base font-semibold text-foreground">
                   {education.lastTermResult || "Not provided"}
-                </p>
+                </p> */}
               </div>
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-xs uppercase tracking-wide text-foreground/60">
@@ -1282,14 +1282,14 @@ export default function ChildDetailPage() {
                 </p>
               </div>
             </div>
-            <div className="rounded-lg bg-muted p-4">
+            {/* <div className="rounded-lg bg-muted p-4">
               <p className="text-xs uppercase tracking-wide text-foreground/60">
                 Education notes
               </p>
               <p className="mt-2 text-sm leading-6 text-foreground/80">
                 {education.educationNotes || "No additional notes"}
               </p>
-            </div>
+            </div> */}
           </div>
         )}
 
