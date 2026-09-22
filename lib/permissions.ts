@@ -18,6 +18,8 @@ export type Permission =
   | "gallery.manage"
   | "content.view"
   | "content.manage"
+  | "messages.view"
+  | "messages.manage"
   | "data.export"
   | "users.manage";
 
@@ -38,6 +40,8 @@ const rolePermissions: Record<UserRole, readonly Permission[]> = {
     "gallery.manage",
     "content.view",
     "content.manage",
+    "messages.view",
+    "messages.manage",
     "data.export",
     "users.manage",
   ],
@@ -60,6 +64,7 @@ const rolePermissions: Record<UserRole, readonly Permission[]> = {
     "events.view",
     "gallery.view",
     "content.view",
+    "messages.view",
     "data.export",
   ],
 };

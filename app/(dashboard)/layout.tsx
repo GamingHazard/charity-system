@@ -58,6 +58,7 @@ export default function DashboardLayout({
     { prefix: "/dashboard/events", permission: "events.view" },
     { prefix: "/dashboard/gallery", permission: "gallery.view" },
     { prefix: "/dashboard/content", permission: "content.view" },
+    { prefix: "/dashboard/messages", permission: "messages.view" },
   ];
   const requiredPermission = routePermissions.find(({ prefix }) =>
     pathname.startsWith(prefix),

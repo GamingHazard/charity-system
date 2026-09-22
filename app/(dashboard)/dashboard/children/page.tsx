@@ -2413,7 +2413,7 @@ export default function ChildrenDashboard() {
           {Array.from({ length: 4 }).map((_, index) => (
             <Card
               key={index}
-              className="overflow-hidden border-border bg-card"
+              className="overflow-hidden p-0 w-96 border-border bg-card"
             >
               <Skeleton className="h-80 w-full rounded-none" />
             </Card>

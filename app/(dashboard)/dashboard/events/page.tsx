@@ -371,10 +371,10 @@ export default function EventsPage() {
   }
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="min-w-0 space-y-6 p-4 sm:p-6 lg:space-y-8 lg:p-8">
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-bold text-foreground mb-2">
+        <h2 className="mb-2 text-2xl font-bold text-foreground sm:text-3xl">
           Events Management
         </h2>
         <p className="text-foreground/70">
@@ -383,7 +383,7 @@ export default function EventsPage() {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card className="p-6">
           <p className="text-foreground/60 text-sm mb-2">Total Events</p>
           <p className="text-3xl font-bold text-foreground">{events.length}</p>
@@ -409,7 +409,7 @@ export default function EventsPage() {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(10rem,1fr)]">
         <div>
           <label className="block text-sm font-medium text-foreground mb-2">
             Search Events
@@ -468,7 +468,7 @@ export default function EventsPage() {
       <Dialog open={showAddDialog} onOpenChange={handleDialogOpenChange}>
         <DialogContent
           preventDismiss
-          className="w-full  bg-card max-h-160 overflow-y-auto max-w-2xl"
+          className="max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto bg-card"
         >
           <DialogHeader>
             <DialogTitle>Create New Event</DialogTitle>
@@ -550,7 +550,7 @@ export default function EventsPage() {
                   description: e.target.value,
                 })
               }
-              className="bg-background min-h-96 max-h-96 border-border"
+              className="min-h-40 max-h-64 bg-background border-border"
             />
 
             <Input
@@ -666,7 +666,7 @@ export default function EventsPage() {
 
       {/* View Event Details Dialog */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-        <DialogContent className="w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-3xl overflow-y-auto">
           {viewingEvent && (
             <>
               <DialogHeader>
@@ -707,7 +707,7 @@ export default function EventsPage() {
                 </div>
 
                 {/* Date & Time */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <p className="text-xs font-medium text-foreground/70 mb-1">
                       Date
@@ -772,31 +772,31 @@ export default function EventsPage() {
 
       {/* Events Table */}
       {!isLoading && events.length > 0 && (
-        <Card className="overflow-hidden h-screen">
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full">
+        <Card className="min-w-0 overflow-hidden">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[920px] table-fixed">
               <thead className="bg-background border-b border-border">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  <th className="w-[22%] px-4 py-3 text-left text-sm font-semibold text-foreground">
                     Title
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  <th className="w-[12%] px-4 py-3 text-left text-sm font-semibold text-foreground">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  <th className="w-[10%] px-4 py-3 text-left text-sm font-semibold text-foreground">
                     Time
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  <th className="w-[20%] px-4 py-3 text-left text-sm font-semibold text-foreground">
                     Location
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  <th className="w-[13%] px-4 py-3 text-left text-sm font-semibold text-foreground">
                     Category
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  <th className="w-[13%] px-4 py-3 text-left text-sm font-semibold text-foreground">
                     Status
                   </th>
 
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-foreground">
+                  <th className="w-[10%] px-4 py-3 text-left text-sm font-semibold text-foreground">
                     Actions
                   </th>
                 </tr>
@@ -807,33 +807,33 @@ export default function EventsPage() {
                     key={event._id}
                     className="border-b border-border hover:bg-background/50"
                   >
-                    <td className="px-6 py-4 text-foreground  truncate line-clamp-2">
+                    <td className="max-w-0 truncate px-4 py-4 text-foreground">
                       {event.title}
                     </td>
-                    <td className="px-6 py-4 text-foreground/70">
+                    <td className="px-4 py-4 text-foreground/70">
                       <div className="flex items-center text-xs gap-2">
                         {/* <Calendar size={14} /> */}
                         {event.date}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-foreground/70">
+                    <td className="px-4 py-4 text-foreground/70">
                       <div className="flex text-xs items-center gap-2">
                         {/* <Clock size={14} /> */}
                         {event.time}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-foreground/70">
-                      <div className="flex truncate line-clamp-2 flex-wrap text-sm items-center gap-2">
+                    <td className="max-w-0 px-4 py-4 text-foreground/70">
+                      <div className="truncate text-sm">
                         {/* <MapPin size={14} /> */}
                         {event.location}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <span className="px-2 py-1 bg-primary/10 text-primary rounded text-xs">
                         {event.category}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <select
                         value={event.status}
                         onChange={(e) =>
@@ -853,7 +853,7 @@ export default function EventsPage() {
                       </select>
                     </td>
 
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <div className="relative">
                         <button
                           onClick={() =>
@@ -930,7 +930,7 @@ export default function EventsPage() {
       {events.length > 0 && filteredEvents.length === 0 && (
         <Card className="p-8 text-center">
           <span className="text-3xl w-full flex items-center justify-center">
-            <img src="/no-campaign.png" className="w-100 h-120" alt="" />
+            <img src="/no-campaign.png" className="h-48 w-48 object-contain" alt="" />
           </span>
           <p className="text-foreground/70">
             No events found matching your filters
@@ -940,7 +940,7 @@ export default function EventsPage() {
       {events.length === 0 && (
         <Card className="p-8 text-center">
           <span className="text-3xl w-full flex items-center justify-center">
-            <img src="/no-events.png" className="w-100 h-120" alt="" />
+            <img src="/no-events.png" className="h-48 w-48 object-contain" alt="" />
           </span>
           <p className="text-foreground/70">
             No events found , start by creating a new event
