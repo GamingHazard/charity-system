@@ -52,8 +52,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiRequest } from "@/lib/query-client";
 import { uploadImageToCloudinary } from "@/lib/cloudinary-upload";
-import { toast } from "@/hooks/use-toast";
-import { ServerError } from "@/components/ui/server-error";
 import { Camera, Loader2 } from "lucide-react";
 
 type SponsorDetail = {
@@ -209,7 +207,6 @@ export default function SponsorDetailPage() {
     customAmounts: {} as Record<string, string>,
   });
   const [formError, setFormError] = useState("");
-  const [pageError, setPageError] = useState("");
   const [formState, setFormState] = useState({
     fullName: "",
     email: "",
@@ -792,11 +789,6 @@ export default function SponsorDetailPage() {
     } catch (error) {
       console.error("Error updating sponsor profile:", error);
       setFormError("Unable to save the sponsor profile. Please try again.");
-      setPageError(
-        error instanceof Error
-          ? error.message
-          : "Unable to save the sponsor profile.",
-      );
     } finally {
       setIsSaving(false);
     }
@@ -808,11 +800,7 @@ export default function SponsorDetailPage() {
     setIsArchiving(true);
     setArchiveError("");
     try {
-      const response = await apiRequest(
-        "DELETE",
-        `/sponsors/profile/${sponsorId}?permanent=true`,
-      );
-      if (!response.ok) throw new Error("Failed to permanently delete sponsor profile.");
+      await apiRequest("DELETE", `/sponsors/profile/${sponsorId}`);
       await queryClient.invalidateQueries({
         queryKey: ["sponsors", "profiles", "all"],
       });
@@ -825,14 +813,9 @@ export default function SponsorDetailPage() {
       setIsArchiveDialogOpen(false);
       router.push("/dashboard/sponsorships");
     } catch (error) {
-      console.error("Error deleting sponsor profile:", error);
+      console.error("Error archiving sponsor profile:", error);
       setArchiveError(
-        "Unable to permanently delete this sponsor profile. Please try again.",
-      );
-      setPageError(
-        error instanceof Error
-          ? error.message
-          : "Unable to permanently delete this sponsor profile.",
+        "Unable to archive this sponsor profile. Please try again.",
       );
     } finally {
       setIsArchiving(false);
@@ -874,11 +857,6 @@ export default function SponsorDetailPage() {
     } catch (error) {
       console.error("Error unlinking child sponsor:", error);
       setUnlinkError("Unable to unlink this child. Please try again.");
-      setPageError(
-        error instanceof Error
-          ? error.message
-          : "Unable to unlink this child.",
-      );
     } finally {
       setIsUnlinking(false);
     }
@@ -935,9 +913,6 @@ export default function SponsorDetailPage() {
         error instanceof Error
           ? error.message
           : "Unable to upload sponsor image.",
-      );
-      setPageError(
-        error instanceof Error ? error.message : "Unable to upload sponsor image.",
       );
     } finally {
       setIsUploadingImage(false);
@@ -1101,9 +1076,6 @@ export default function SponsorDetailPage() {
     } catch (error) {
       console.error("Error recording donation:", error);
       setPaymentError(
-        error instanceof Error ? error.message : "Unable to record donation.",
-      );
-      setPageError(
         error instanceof Error ? error.message : "Unable to record donation.",
       );
     } finally {
@@ -1583,7 +1555,7 @@ export default function SponsorDetailPage() {
       </div>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent preventDismiss className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit sponsor profile</DialogTitle>
           </DialogHeader>
@@ -1784,10 +1756,7 @@ export default function SponsorDetailPage() {
           if (!isRecordingPayment) setIsPaymentDialogOpen(open);
         }}
       >
-        <DialogContent
-          preventDismiss
-          className="max-h-[90vh] max-w-2xl overflow-y-auto"
-        >
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Record donation</DialogTitle>
           </DialogHeader>
@@ -2120,10 +2089,11 @@ export default function SponsorDetailPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete sponsor profile permanently?</AlertDialogTitle>
+            <AlertDialogTitle>Delete sponsor profile?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the sponsor profile and its stored
-              sponsorship and payment history. This action cannot be undone.
+              This will release the sponsor&apos;s active children and hide the
+              profile from active lists. Sponsorship and payment history will be
+              preserved.
             </AlertDialogDescription>
             {archiveError ? (
               <p className="text-sm text-destructive">{archiveError}</p>
@@ -2144,7 +2114,6 @@ export default function SponsorDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <ServerError message={pageError} />
     </div>
   );
 }

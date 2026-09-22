@@ -44,8 +44,6 @@ import {
 import type { PaymentRecord, SponsorshipRecord } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
-import { toast } from "@/hooks/use-toast";
-import { ServerError } from "@/components/ui/server-error";
 
 type SponsorshipStatus = SponsorshipRecord["status"];
 type PaymentStatus = PaymentRecord["status"];
@@ -133,7 +131,6 @@ const initialSponsorForm: SponsorForm = {
   startDate: new Date().toISOString().slice(0, 10),
 };
 
-const emptyChildren: any[] = [];
 const emptySponsorshipRecords: SponsorshipRecord[] = [];
 
 function getStatusClasses(status: SponsorshipStatus | string) {
@@ -161,12 +158,10 @@ export default function SponsorshipsDashboard() {
   const { data: sponsorships, isLoading } = useQuery<SponsorProfile[]>({
     queryKey: ["sponsors", "profiles", "all"],
   });
-  const { data: childrenData = emptyChildren } = useQuery<any[]>({
+  const { data: childrenData = [] } = useQuery<any[]>({
     queryKey: ["children", "profiles"],
   });
-  const { data: sponsorshipRecords = emptySponsorshipRecords } = useQuery<
-    SponsorshipRecord[]
-  >({
+  const { data: sponsorshipRecords = emptySponsorshipRecords } = useQuery<SponsorshipRecord[]>({
     queryKey: ["sponsors", "sponsorship", "records"],
   });
 
@@ -190,13 +185,12 @@ export default function SponsorshipsDashboard() {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sponsorSubmitting, setSponsorSubmitting] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<SponsorProfile | null>(
+  const [archiveTarget, setArchiveTarget] = useState<SponsorProfile | null>(
     null,
   );
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState("");
   const [sponsorFormError, setSponsorFormError] = useState("");
-  const [pageError, setPageError] = useState("");
   const [paymentForm, setPaymentForm] = useState(initialPayment);
   const [sponsorForm, setSponsorForm] =
     useState<SponsorForm>(initialSponsorForm);
@@ -271,7 +265,6 @@ export default function SponsorshipsDashboard() {
   const handleUpdateProfile = async () => {
     const sponsorId = selectedSponsorProfile?._id || selectedRecord?.donor?._id;
     if (!sponsorId) return;
-    setPageError("");
 
     try {
       const response = await apiRequest(
@@ -300,17 +293,8 @@ export default function SponsorshipsDashboard() {
       await queryClient.invalidateQueries({
         queryKey: ["sponsors", "profiles", "all"],
       });
-      toast({
-        title: "Sponsor profile updated",
-        description: "The sponsor profile was updated successfully.",
-      });
     } catch (error) {
       console.error("Error updating sponsor profile:", error);
-      setPageError(
-        error instanceof Error
-          ? error.message
-          : "Failed to update sponsor profile.",
-      );
       setSponsorFormError(
         "Failed to update sponsor profile. Please try again.",
       );
@@ -338,7 +322,6 @@ export default function SponsorshipsDashboard() {
 
     setSponsorSubmitting(true);
     setSponsorFormError("");
-    setPageError("");
 
     try {
       const payload = {
@@ -391,17 +374,8 @@ export default function SponsorshipsDashboard() {
 
       setIsCreateDialogOpen(false);
       resetSponsorForm();
-      toast({
-        title: "Sponsor profile created",
-        description: "The sponsor profile was created successfully.",
-      });
     } catch (error) {
       console.error("Error creating sponsor profile:", error);
-      setPageError(
-        error instanceof Error
-          ? error.message
-          : "Failed to create sponsor profile.",
-      );
       setSponsorFormError(
         "Failed to create sponsor profile. Please try again.",
       );
@@ -410,52 +384,32 @@ export default function SponsorshipsDashboard() {
     }
   };
 
-  const handleDeleteSponsor = async () => {
-    if (!deleteTarget?._id) return;
+  const handleArchiveSponsor = async () => {
+    if (!archiveTarget?._id) return;
 
-    setIsDeleting(true);
-    setDeleteError("");
-    setPageError("");
+    setIsArchiving(true);
+    setArchiveError("");
     try {
-      const response = await apiRequest(
-        "DELETE",
-        `/sponsors/profile/${deleteTarget._id}?permanent=true`,
-      );
-      if (!response.ok) throw new Error("Failed to permanently delete sponsor profile");
+      await apiRequest("DELETE", `/sponsors/profile/${archiveTarget._id}`);
       await queryClient.invalidateQueries({
         queryKey: ["sponsors", "profiles", "all"],
       });
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],
       });
-      setDeleteTarget(null);
-      toast({
-        title: "Sponsor profile deleted",
-        description: "The sponsor profile was permanently deleted.",
-      });
+      setArchiveTarget(null);
     } catch (error) {
-      console.error("Error deleting sponsor profile:", error);
-      setPageError(
-        error instanceof Error
-          ? error.message
-          : "Unable to permanently delete this sponsor profile.",
+      console.error("Error archiving sponsor profile:", error);
+      setArchiveError(
+        "Unable to archive this sponsor profile. Please try again.",
       );
-      setDeleteError(
-        "Unable to permanently delete this sponsor profile. Please try again.",
-      );
-      toast({
-        variant: "destructive",
-        title: "Unable to delete sponsor profile",
-        description: "Please try again.",
-      });
     } finally {
-      setIsDeleting(false);
+      setIsArchiving(false);
     }
   };
 
   const handleUpdateStatus = async (status: SponsorshipStatus) => {
     if (!selectedRecord) return;
-    setPageError("");
 
     try {
       const res = await apiRequest(
@@ -481,22 +435,8 @@ export default function SponsorshipsDashboard() {
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],
       });
-      toast({
-        title: "Sponsorship status updated",
-        description: "The sponsorship status was updated successfully.",
-      });
     } catch (error) {
       console.error("Error updating sponsorship status:", error);
-      setPageError(
-        error instanceof Error
-          ? error.message
-          : "Failed to update sponsorship status.",
-      );
-      toast({
-        variant: "destructive",
-        title: "Unable to update sponsorship status",
-        description: "Please try again.",
-      });
     }
   };
 
@@ -506,7 +446,6 @@ export default function SponsorshipsDashboard() {
     }
 
     setLoading(true);
-  setPageError("");
     try {
       const amountValue = Number(paymentForm.amount);
       if (isNaN(amountValue) || amountValue <= 0) {
@@ -573,20 +512,8 @@ export default function SponsorshipsDashboard() {
         queryKey: ["children", "profiles"],
       });
       setPaymentForm(initialPayment);
-      toast({
-        title: "Payment recorded",
-        description: "The sponsorship payment was recorded successfully.",
-      });
     } catch (error) {
       console.error("Error adding payment:", error);
-      setPageError(
-        error instanceof Error ? error.message : "Failed to add payment.",
-      );
-      toast({
-        variant: "destructive",
-        title: "Unable to record payment",
-        description: "Please check the payment details and try again.",
-      });
     } finally {
       setLoading(false);
     }
@@ -902,10 +829,10 @@ export default function SponsorshipsDashboard() {
                         variant="outline"
                         size="sm"
                         className="text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(profile)}
+                        onClick={() => setArchiveTarget(profile)}
                       >
                         <Archive className="mr-1 size-4" />
-                        Delete permanently
+                        Archive
                       </Button>
                     </div>
                   </TableCell> */}
@@ -917,49 +844,50 @@ export default function SponsorshipsDashboard() {
       </Card>
 
       <Dialog
-        open={Boolean(deleteTarget)}
+        open={Boolean(archiveTarget)}
         onOpenChange={(open) => {
           if (!open) {
-            setDeleteTarget(null);
-            setDeleteError("");
+            setArchiveTarget(null);
+            setArchiveError("");
           }
         }}
       >
-        <DialogContent preventDismiss>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete sponsor profile permanently?</DialogTitle>
+            <DialogTitle>Archive sponsor profile?</DialogTitle>
             <DialogDescription>
-              This will permanently delete the sponsor profile and its stored
-              sponsorship and payment history. This action cannot be undone.
+              This will release the sponsor&apos;s active children and hide the
+              profile from active lists. Sponsorship and payment history will be
+              preserved.
             </DialogDescription>
-            {deleteError ? (
-              <p className="text-sm text-destructive">{deleteError}</p>
+            {archiveError ? (
+              <p className="text-sm text-destructive">{archiveError}</p>
             ) : null}
           </DialogHeader>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline" disabled={isDeleting}>
+              <Button variant="outline" disabled={isArchiving}>
                 Cancel
               </Button>
             </DialogClose>
             <Button
               variant="destructive"
-              onClick={handleDeleteSponsor}
-              disabled={isDeleting}
+              onClick={handleArchiveSponsor}
+              disabled={isArchiving}
             >
-              {isDeleting ? (
+              {isArchiving ? (
                 <Loader className="mr-2 size-4 animate-spin" />
               ) : (
                 <Archive className="mr-2 size-4" />
               )}
-              {isDeleting ? "Deleting..." : "Delete permanently"}
+              {isArchiving ? "Archiving..." : "Archive profile"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent preventDismiss className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create sponsor profile</DialogTitle>
             <DialogDescription>
@@ -1742,7 +1670,6 @@ export default function SponsorshipsDashboard() {
           )}
         </DialogContent>
       </Dialog>
-      <ServerError message={pageError} />
     </div>
   );
 }

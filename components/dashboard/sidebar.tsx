@@ -58,9 +58,30 @@ const sidebarItems = [
     icon: "✉️",
     permission: "messages.view",
   },
-  // { href: "/dashboard/analytics", label: "Analytics", icon: "📈" },
-  // { href: "/dashboard/content", label: "Content", icon: "📝" },
-  // { href: "/dashboard/settings", label: "Settings", icon: "⚙️" },
+  {
+    href: "/dashboard/analytics",
+    label: "Analytics",
+    icon: "📈",
+    permission: "analytics.view",
+  },
+  {
+    href: "/dashboard/donations",
+    label: "Donations",
+    icon: "💰",
+    permission: "donations.view",
+  },
+  {
+    href: "/dashboard/content",
+    label: "Content",
+    icon: "📝",
+    permission: "content.view",
+  },
+  {
+    href: "/dashboard/settings",
+    label: "Settings",
+    icon: "⚙️",
+    permission: "settings.view",
+  },
 ];
 
 export function DashboardSidebar() {

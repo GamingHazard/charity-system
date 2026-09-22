@@ -1,9 +1,10 @@
-export const roles = ["admin", "blogger", "viewer"] as const;
+export const roles = ["developer", "admin", "editor"] as const;
 
 export type UserRole = (typeof roles)[number];
 
 export type Permission =
   | "dashboard.view"
+  | "analytics.view"
   | "children.view"
   | "children.manage"
   | "sponsorships.view"
@@ -18,14 +19,18 @@ export type Permission =
   | "gallery.manage"
   | "content.view"
   | "content.manage"
+  | "donations.view"
+  | "settings.view"
+  | "newsletter.view"
   | "messages.view"
   | "messages.manage"
   | "data.export"
   | "users.manage";
 
 const rolePermissions: Record<UserRole, readonly Permission[]> = {
-  admin: [
+  developer: [
     "dashboard.view",
+    "analytics.view",
     "children.view",
     "children.manage",
     "sponsorships.view",
@@ -40,32 +45,32 @@ const rolePermissions: Record<UserRole, readonly Permission[]> = {
     "gallery.manage",
     "content.view",
     "content.manage",
+    "donations.view",
+    "settings.view",
     "messages.view",
     "messages.manage",
+    "newsletter.view",
     "data.export",
     "users.manage",
   ],
-  blogger: [
+  admin: [
     "dashboard.view",
+    "children.view",
+    "children.manage",
+    "sponsorships.view",
+    "sponsorships.manage",
+    "staff.view",
+    "staff.manage",
+    "messages.view",
+    "messages.manage",
+  ],
+  editor: [
     "blogs.view",
     "blogs.manage",
     "events.view",
     "events.manage",
     "gallery.view",
     "gallery.manage",
-    "data.export",
-  ],
-  viewer: [
-    "dashboard.view",
-    "children.view",
-    "sponsorships.view",
-    "staff.view",
-    "blogs.view",
-    "events.view",
-    "gallery.view",
-    "content.view",
-    "messages.view",
-    "data.export",
   ],
 };
 
