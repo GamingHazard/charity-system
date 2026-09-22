@@ -1111,7 +1111,7 @@ export default function ChildDetailPage() {
                 Sponsor
               </p>
               <p className="mt-1 text-base font-semibold text-foreground">
-                {sponsorProfile?.name || "No sponsor yet"}
+                {sponsorProfile?.profile?.name || "No sponsor yet"}
               </p>
             </div>
           </div>

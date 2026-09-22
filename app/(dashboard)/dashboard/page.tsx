@@ -10,6 +10,8 @@ import {
   AnimatedContainer,
 } from "@/components/motion/animated-elements";
 import { AnimatedCounter } from "@/components/motion/animated-counter";
+import { useAuth } from "@/lib/auth-context";
+import type { Permission } from "@/lib/permissions";
 
 type DashboardSummary = {
   children: { total: number; sponsored: number; available: number };
@@ -41,6 +43,7 @@ type DashboardSummary = {
 };
 
 export default function DashboardPage() {
+  const { can } = useAuth();
   const { data, isLoading, isError, refetch } = useQuery<DashboardSummary>({
     queryKey: ["dashboard", "summary"],
     queryFn: async () => {
@@ -87,6 +90,19 @@ export default function DashboardPage() {
       color: "bg-accent",
     },
   ];
+
+  const quickActions = [
+    { href: "/dashboard/children", label: "🧒 Children", permission: "children.view" },
+    { href: "/dashboard/sponsorships", label: "💝 Sponsorships", permission: "sponsorships.view" },
+    { href: "/dashboard/staff", label: "👥 Staff & Volunteers", permission: "staff.view" },
+    { href: "/dashboard/blogs", label: "📖 Blogs", permission: "blogs.view" },
+    { href: "/dashboard/gallery", label: "🖼️ Gallery", permission: "gallery.view" },
+    { href: "/dashboard/events", label: "📅 Events", permission: "events.view" },
+  ] as const;
+
+  const visibleQuickActions = quickActions.filter((action) =>
+    can(action.permission as Permission),
+  );
 
   return (
     <div className="p-8">
@@ -149,54 +165,16 @@ export default function DashboardPage() {
                 Quick Actions
               </h3>
               <div className="space-y-2 gap-5 flex flex-col">
-                <Link className="mx-5" href="/dashboard/children">
-                  <Button
-                    className=" w-full justify-start text-left"
-                    variant="outline"
-                  >
-                    🧒 Children
-                  </Button>
-                </Link>
-                <Link className="mx-5" href="/dashboard/sponsorships">
-                  <Button
-                    className=" w-full justify-start text-left"
-                    variant="outline"
-                  >
-                    💝 Sponsorships
-                  </Button>
-                </Link>
-                <Link className="mx-5" href="/dashboard/staff">
-                  <Button
-                    className=" w-full justify-start text-left"
-                    variant="outline"
-                  >
-                    👥 Staff & Volunteers
-                  </Button>
-                </Link>
-                <Link className="mx-5" href="/dashboard/blogs">
-                  <Button
-                    className=" w-full justify-start text-left"
-                    variant="outline"
-                  >
-                    📖 Blogs
-                  </Button>
-                </Link>
-                <Link className="mx-5" href="/dashboard/gallery">
-                  <Button
-                    className=" w-full justify-start text-left"
-                    variant="outline"
-                  >
-                    🖼️ Gallery
-                  </Button>
-                </Link>
-                <Link className="mx-5" href="/dashboard/events">
-                  <Button
-                    className=" w-full justify-start text-left"
-                    variant="outline"
-                  >
-                    📅 Events
-                  </Button>
-                </Link>
+                {visibleQuickActions.map((action) => (
+                  <Link className="mx-5" href={action.href} key={action.href}>
+                    <Button
+                      className="w-full justify-start text-left"
+                      variant="outline"
+                    >
+                      {action.label}
+                    </Button>
+                  </Link>
+                ))}
               </div>
             </Card>
           </AnimatedElement>
@@ -244,9 +222,11 @@ export default function DashboardPage() {
               Latest recorded sponsorship payments
             </p>
           </div>
-          <Link href="/dashboard/sponsorships">
-            <Button variant="outline">View sponsorships</Button>
-          </Link>
+          {can("sponsorships.view") ? (
+            <Link href="/dashboard/sponsorships">
+              <Button variant="outline">View sponsorships</Button>
+            </Link>
+          ) : null}
         </div>
         {summary.recentPayments.length > 0 ? (
           <div className="space-y-3">
