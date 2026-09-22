@@ -46,6 +46,8 @@ import { apiRequest } from "@/lib/query-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { ServerError } from "@/components/ui/server-error";
+import { Skeleton } from "@/components/ui/skeleton";
+import { jsPDF } from "jspdf";
 
 const initialFormState: any = {
   _id: "",
@@ -82,12 +84,19 @@ const initialFormState: any = {
   monthlyNeed: "",
   education: {
     isStudying: false,
+    educationStage: "",
     currentLevel: "",
     schoolName: "",
     classGrade: "",
     currentClass: "",
     academicYear: "",
+    enrollmentDate: "",
+    courseName: "",
+    courseDurationValue: "",
+    courseDurationUnit: "months",
+    expectedGraduationDate: "",
     expectedGraduationYear: "",
+    graduationStage: "",
     lastTermResult: "",
     graduationTarget: "",
     estimatedGraduationYear: "",
@@ -108,9 +117,18 @@ const educationLevels = [
   "kindergarten",
   "primary",
   "secondary",
+  "secondary-o",
+  "secondary-a",
   "vocational",
   "university",
 ] as const;
+
+const educationClassOptions: Record<string, string[]> = {
+  kindergarten: ["Baby", "Middle", "Top"],
+  primary: ["P-1", "P-2", "P-3", "P-4", "P-5", "P-6", "P-7"],
+  "secondary-o": ["S-1", "S-2", "S-3", "S-4"],
+  "secondary-a": ["S-5", "S-6"],
+};
 
 function normalizeEducationLevel(value?: string) {
   const normalized = String(value || "").trim().toLowerCase();
@@ -265,6 +283,27 @@ function downloadChildrenFile(content: string, filename: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+async function loadProfilePdfImage(url: string) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Unable to load an image for the PDF.");
+  const blob = await response.blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Unable to prepare PDF image."));
+    reader.readAsDataURL(blob);
+  });
+  const dimensions = await new Promise<{ width: number; height: number }>(
+    (resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve({ width: image.width, height: image.height });
+      image.onerror = () => reject(new Error("Unable to read PDF image."));
+      image.src = dataUrl;
+    },
+  );
+  return { dataUrl, format: blob.type.includes("png") ? "PNG" : "JPEG", ...dimensions };
+}
+
 function formatDisplayDate(value?: string | Date | null) {
   if (!value) return "Not provided";
 
@@ -338,6 +377,7 @@ export default function ChildrenDashboard() {
   const [pageError, setPageError] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [downloadingProfileId, setDownloadingProfileId] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [publishState, setPublishState] = useState<Record<string, boolean>>({});
@@ -531,6 +571,174 @@ export default function ChildrenDashboard() {
     );
   };
 
+  const downloadChildProfilePdf = async (child: SponsorshipProfile) => {
+    setDownloadingProfileId(child._id);
+
+    try {
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 16;
+      const contentWidth = pageWidth - margin * 2;
+      const fullName = [child.firstName, child.secondName, child.givenName]
+        .filter(Boolean)
+        .join(" ") || "Child profile";
+      let cursor = margin;
+
+      const displayValue = (value: unknown) => {
+        const text = String(value ?? "").trim();
+        return text || "Not provided";
+      };
+      const addPageIfNeeded = (height: number) => {
+        if (cursor + height <= pageHeight - margin) return;
+        pdf.addPage();
+        cursor = margin;
+      };
+      const addSection = (title: string) => {
+        addPageIfNeeded(16);
+        cursor += 4;
+        pdf.setTextColor(47, 112, 94);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(12);
+        pdf.text(title.toUpperCase(), margin, cursor);
+        pdf.setDrawColor(47, 112, 94);
+        pdf.setLineWidth(0.6);
+        pdf.line(margin, cursor + 3, pageWidth - margin, cursor + 3);
+        cursor += 11;
+      };
+      const addRows = (rows: Array<[string, unknown]>) => {
+        rows.forEach(([label, value]) => {
+          const lines = pdf.splitTextToSize(displayValue(value), contentWidth - 42);
+          addPageIfNeeded(Math.max(9, lines.length * 4 + 5));
+          pdf.setTextColor(102, 112, 107);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(8);
+          pdf.text(label.toUpperCase(), margin, cursor);
+          pdf.setTextColor(28, 36, 33);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(9.5);
+          pdf.text(lines, margin + 42, cursor);
+          cursor += Math.max(9, lines.length * 4 + 5);
+        });
+      };
+
+      const logo = await loadProfilePdfImage("/dark-logo.jpeg");
+      const logoSize = 9;
+      const logoScale = Math.min(logoSize / logo.width, logoSize / logo.height);
+      pdf.addImage(
+        logo.dataUrl,
+        logo.format,
+        margin,
+        cursor - 5,
+        logo.width * logoScale,
+        logo.height * logoScale,
+      );
+      pdf.setTextColor(47, 112, 94);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.text("ENSIGO OF LOVE FOUNDATION", margin + logoSize + 3, cursor);
+      pdf.setTextColor(102, 112, 107);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.text(new Date().toLocaleDateString(), pageWidth - margin, cursor, {
+        align: "right",
+      });
+      cursor += 14;
+      cursor += 12;
+      pdf.setTextColor(28, 36, 33);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(24);
+      pdf.text("PROFILE & BIO", margin, cursor);
+      cursor += 8;
+      pdf.setTextColor(102, 112, 107);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text(
+        "A detailed child profile for care, education, and sponsorship planning.",
+        margin,
+        cursor,
+      );
+      cursor += 10;
+
+      const profileImage = child.image?.url
+        ? await loadProfilePdfImage(child.image.url)
+        : null;
+      const imageWidth = 62;
+      const imageHeight = 68;
+      pdf.setFillColor(241, 245, 242);
+      pdf.roundedRect(margin, cursor, imageWidth, imageHeight, 2, 2, "F");
+      if (profileImage) {
+        const scale = Math.min(imageWidth / profileImage.width, imageHeight / profileImage.height);
+        pdf.addImage(
+          profileImage.dataUrl,
+          profileImage.format,
+          margin + (imageWidth - profileImage.width * scale) / 2,
+          cursor + (imageHeight - profileImage.height * scale) / 2,
+          profileImage.width * scale,
+          profileImage.height * scale,
+        );
+      } else {
+        pdf.setTextColor(102, 112, 107);
+        pdf.setFontSize(9);
+        pdf.text("Image not available", margin + imageWidth / 2, cursor + imageHeight / 2, {
+          align: "center",
+        });
+      }
+      const detailsX = margin + imageWidth + 12;
+      const detailsWidth = contentWidth - imageWidth - 12;
+      const summaryRows: Array<[string, unknown]> = [
+        ["Name", fullName],
+        ["Gender", child.gender],
+        ["Age", child.age],
+        ["Date of birth", child.dateOfBirth ? formatDisplayDate(child.dateOfBirth) : "Not provided"],
+        ["Nationality", child.nationality],
+        ["Location", child.location],
+      ];
+      summaryRows.forEach(([label, value]) => {
+        pdf.setTextColor(102, 112, 107);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7.5);
+        pdf.text(label.toUpperCase(), detailsX, cursor);
+        pdf.setTextColor(28, 36, 33);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.text(pdf.splitTextToSize(displayValue(value), detailsWidth), detailsX, cursor + 5);
+        cursor += 10;
+      });
+      cursor = cursor < margin + imageHeight + 10 ? margin + imageHeight + 10 : cursor + 10;
+      addSection("Family");
+      addRows([
+        ["Family status", child.familyStatus],
+        ["Number of parents", child.numberOfParents],
+        ["Guardian", child.guardianName],
+        ["Relationship", child.guardianRelation],
+        ["Contact", child.guardianContact],
+      ]);
+      addSection("Education");
+      addRows([
+        ["School", child.education?.schoolName || child.school],
+        ["Current level", child.education?.currentLevel],
+        ["Current class", child.education?.currentClass || child.class],
+        ["Academic year", child.education?.academicYear],
+      ]);
+      addSection("Sponsor details");
+      addRows([
+        ["Sponsorship status", child.sponsorshipStatus],
+        ["Sponsor", getSponsorLabel(child)],
+        ["Monthly need", child.monthlyNeed],
+      ]);
+      addSection("Background and needs");
+      addRows([
+        ["Background", child.background],
+        ["Needs", Array.isArray(child.needs) ? child.needs.join(", ") : child.needs],
+      ]);
+
+      pdf.save(`child-profile-${child._id}.pdf`);
+    } finally {
+      setDownloadingProfileId("");
+    }
+  };
+
   const openEditProfile = (child: SponsorshipProfile) => {
     setEditingChild(child);
     setFormState({
@@ -564,12 +772,19 @@ export default function ChildrenDashboard() {
       education: {
         isStudying:
           child.education?.isStudying ?? Boolean(child.education?.currentLevel),
+        educationStage:
+          child.education?.educationStage || normalizeEducationLevel(child.education?.currentLevel),
         currentLevel: normalizeEducationLevel(child.education?.currentLevel),
         schoolName: child.education?.schoolName || child.school || "",
         classGrade:
           child.education?.classGrade || child.education?.currentClass || "",
         currentClass: child.education?.currentClass || "",
         academicYear: child.education?.academicYear || "",
+        enrollmentDate: child.education?.enrollmentDate || "",
+        courseName: child.education?.courseName || "",
+        courseDurationValue: child.education?.courseDurationValue || "",
+        courseDurationUnit: child.education?.courseDurationUnit || "months",
+        expectedGraduationDate: child.education?.expectedGraduationDate || "",
         expectedGraduationYear:
           child.education?.expectedGraduationYear ||
           child.education?.estimatedGraduationYear ||
@@ -577,6 +792,7 @@ export default function ChildrenDashboard() {
         lastTermResult: child.education?.lastTermResult || "",
         graduationTarget: child.education?.graduationTarget || "",
         estimatedGraduationYear: child.education?.estimatedGraduationYear || "",
+        graduationStage: child.education?.graduationStage || "",
         educationNotes: child.education?.educationNotes || "",
       },
       reportCards: child.reportCards || [],
@@ -791,11 +1007,30 @@ export default function ChildrenDashboard() {
     }
 
     if (wizardStep === 4 && formState.education.isStudying) {
+      const { education } = formState;
+      if (!education.educationStage || !education.enrollmentDate) {
+        setFormError("Please provide the education stage and enrollment date.");
+        return false;
+      }
+      if (!education.schoolName.trim()) {
+        setFormError("Please provide the school or institution.");
+        return false;
+      }
       if (
-        !formState.education.schoolName.trim() ||
-        !formState.education.classGrade
+        education.educationStage !== "vocational" &&
+        education.educationStage !== "university" &&
+        !education.classGrade
       ) {
-        setFormError("Please provide the school and class or grade.");
+        setFormError("Please provide the current class or level.");
+        return false;
+      }
+      if (
+        ["vocational", "university"].includes(education.educationStage) &&
+        (!education.courseName.trim() ||
+          !Number(education.courseDurationValue) ||
+          Number(education.courseDurationValue) <= 0)
+      ) {
+        setFormError("Please provide the course and its duration.");
         return false;
       }
     }
@@ -834,8 +1069,10 @@ export default function ChildrenDashboard() {
           formState.education.classGrade || formState.education.currentClass,
         currentClass:
           formState.education.classGrade || formState.education.currentClass,
-        expectedGraduationYear:
-          formState.education.expectedGraduationYear || "",
+        currentLevel: formState.education.educationStage,
+        expectedGraduationYear: "",
+        expectedGraduationDate: "",
+        graduationStage: "",
       };
 
       const payload: any = {
@@ -1859,6 +2096,37 @@ export default function ChildrenDashboard() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="educationStage">Education stage</Label>
+              <Select
+                disabled={!formState.education.isStudying}
+                value={formState.education.educationStage}
+                onValueChange={(value) =>
+                  setFormState({
+                    ...formState,
+                    education: {
+                      ...formState.education,
+                      educationStage: value,
+                      currentLevel: value,
+                      classGrade: "",
+                      currentClass: "",
+                    },
+                  })
+                }
+              >
+                <SelectTrigger className="bg-background" id="educationStage">
+                  <SelectValue placeholder="Select education stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kindergarten">Kindergarten / pre-primary</SelectItem>
+                  <SelectItem value="primary">Primary</SelectItem>
+                  <SelectItem value="secondary-o">Secondary O-Level</SelectItem>
+                  <SelectItem value="secondary-a">Secondary A-Level</SelectItem>
+                  <SelectItem value="vocational">Vocational institute</SelectItem>
+                  <SelectItem value="university">University / college</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="schoolName">Name of school</Label>
               <Input
                 disabled={formState.education.isStudying === false}
@@ -1898,25 +2166,7 @@ export default function ChildrenDashboard() {
                   <SelectValue placeholder="Select class or grade" />
                 </SelectTrigger>
                 <SelectContent>
-                  {[
-                    "Baby",
-                    "Top",
-                    "P-1",
-                    "P-2",
-                    "P-3",
-                    "P-4",
-                    "P-5",
-                    "P-6",
-                    "P-7",
-                    "S-1",
-                    "S-2",
-                    "S-3",
-                    "S-4",
-                    "S-5",
-                    "S-6",
-                    "Vocational school",
-                    "University",
-                  ].map((value) => (
+                  {(educationClassOptions[formState.education.educationStage] || []).map((value) => (
                     <SelectItem key={value} value={value}>
                       {value}
                     </SelectItem>
@@ -1925,26 +2175,81 @@ export default function ChildrenDashboard() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="expectedGraduationYear">
-                Expected graduation year
-              </Label>
+              <Label htmlFor="enrollmentDate">Enrollment / course start date</Label>
               <Input
                 disabled={formState.education.isStudying === false}
                 className="bg-background"
-                id="expectedGraduationYear"
-                type="number"
-                min={new Date().getFullYear()}
-                value={formState.education.expectedGraduationYear}
+                id="enrollmentDate"
+                type="date"
+                value={formState.education.enrollmentDate}
                 onChange={(event) =>
                   setFormState({
                     ...formState,
                     education: {
                       ...formState.education,
-                      expectedGraduationYear: event.target.value,
+                      enrollmentDate: event.target.value,
                     },
                   })
                 }
               />
+            </div>
+            {["vocational", "university"].includes(formState.education.educationStage) && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="courseName">Course / program</Label>
+                  <Input
+                    className="bg-background"
+                    id="courseName"
+                    value={formState.education.courseName}
+                    onChange={(event) =>
+                      setFormState({
+                        ...formState,
+                        education: { ...formState.education, courseName: event.target.value },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="courseDurationValue">Course duration</Label>
+                  <Input
+                    className="bg-background"
+                    id="courseDurationValue"
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    value={formState.education.courseDurationValue}
+                    onChange={(event) =>
+                      setFormState({
+                        ...formState,
+                        education: { ...formState.education, courseDurationValue: event.target.value },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="courseDurationUnit">Duration unit</Label>
+                  <Select
+                    value={formState.education.courseDurationUnit}
+                    onValueChange={(value) =>
+                      setFormState({
+                        ...formState,
+                        education: { ...formState.education, courseDurationUnit: value },
+                      })
+                    }
+                  >
+                    <SelectTrigger className="bg-background" id="courseDurationUnit">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="months">Months</SelectItem>
+                      <SelectItem value="years">Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+            <div className="rounded-md border border-dashed bg-muted/40 p-3 text-sm text-muted-foreground md:col-span-2">
+              Expected graduation is calculated by the server from the stage, current class, enrollment date, and course duration.
             </div>
           </div>
         );
@@ -2103,117 +2408,141 @@ export default function ChildrenDashboard() {
         </div>
       </Card>
 
-      <div className="grid bg-background rounded-lg gap-6 lg:grid-cols-2">
-        {filteredChildren.map((child, index) => (
-          <Card
-            key={child._id || index}
-            className="overflow-hidden bg-card border-border transition-shadow hover:shadow-md"
-          >
-            <div className="relative h-80 overflow-hidden">
-              <img
-                src={child.image?.url || "/no-staff.avif"}
-                alt={child.firstName || "Child profile"}
-                className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-              />
+      {isLoading ? (
+        <div className="grid gap-6 bg-background rounded-lg lg:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Card
+              key={index}
+              className="overflow-hidden border-border bg-card"
+            >
+              <Skeleton className="h-80 w-full rounded-none" />
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid bg-background rounded-lg gap-6 lg:grid-cols-2">
+          {filteredChildren.map((child, index) => (
+            <Card
+              key={child._id || index}
+              className="overflow-hidden w-96 p-0 bg-card border-border transition-shadow hover:shadow-md"
+            >
+              <div className="relative h-80 overflow-hidden">
+                <img
+                  src={child.image?.url || "/no-staff.avif"}
+                  alt={child.firstName || "Child profile"}
+                  className="h-full w-full object-fill transition-transform duration-300 hover:scale-105"
+                />
 
-              <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/20 to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/20 to-transparent" />
 
-              <div className="absolute left-4 top-4">
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(child.sponsorshipStatus || "Available")}`}
-                >
-                  {child.sponsorshipStatus}
-                </span>
-              </div>
+                <div className="absolute left-4 top-4">
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(child.sponsorshipStatus || "Available")}`}
+                  >
+                    {child.sponsorshipStatus}
+                  </span>
+                </div>
 
-              <div className="absolute right-4 top-4">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-9 w-9 rounded-full bg-background/90 text-foreground hover:bg-background"
-                    >
-                      <MoreHorizontal size={16} />
-                    </Button>
-                  </DropdownMenuTrigger>
+                <div className="absolute right-4 top-4">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-9 w-9 rounded-full bg-background/90 text-foreground hover:bg-background"
+                      >
+                        <MoreHorizontal size={16} />
+                      </Button>
+                    </DropdownMenuTrigger>
 
-                  <DropdownMenuContent align="end" className="w-52">
-                    <DropdownMenuItem
-                      onClick={() => openViewProfile(child)}
-                      className="cursor-pointer"
-                    >
-                      <Eye size={14} className="mr-2" />
-                      View profile
-                    </DropdownMenuItem>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuItem
+                        onClick={() => openViewProfile(child)}
+                        className="cursor-pointer"
+                      >
+                        <Eye size={14} className="mr-2" />
+                        View profile
+                      </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      onClick={() =>
-                        !child.sponsor &&
-                        child.sponsorshipStatus !== "Sponsored" &&
-                        openAssignSponsor(child)
-                      }
-                      disabled={
-                        Boolean(child.sponsor) ||
-                        child.sponsorshipStatus === "Sponsored"
-                      }
-                      className="cursor-pointer"
-                    >
-                      <Plus size={14} className="mr-2" />
-                      {child.sponsor || child.sponsorshipStatus === "Sponsored"
-                        ? "Already sponsored"
-                        : "Assign sponsor"}
-                    </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => void downloadChildProfilePdf(child)}
+                        disabled={downloadingProfileId === child._id}
+                        className="cursor-pointer"
+                      >
+                        <Download size={14} className="mr-2" />
+                        {downloadingProfileId === child._id
+                          ? "Preparing PDF..."
+                          : "Download profile"}
+                      </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      onClick={() => openEditProfile(child)}
-                      className="cursor-pointer"
-                    >
-                      <Edit size={14} className="mr-2" />
-                      Edit
-                    </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          !child.sponsor &&
+                          child.sponsorshipStatus !== "Sponsored" &&
+                          openAssignSponsor(child)
+                        }
+                        disabled={
+                          Boolean(child.sponsor) ||
+                          child.sponsorshipStatus === "Sponsored"
+                        }
+                        className="cursor-pointer"
+                      >
+                        <Plus size={14} className="mr-2" />
+                        {child.sponsor || child.sponsorshipStatus === "Sponsored"
+                          ? "Already sponsored"
+                          : "Assign sponsor"}
+                      </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      onClick={() => handleDeleteProfile(child._id)}
-                      className="cursor-pointer text-destructive focus:text-destructive"
-                    >
-                      <Trash2 size={14} className="mr-2" />
-                      Delete
-                    </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => openEditProfile(child)}
+                        className="cursor-pointer"
+                      >
+                        <Edit size={14} className="mr-2" />
+                        Edit
+                      </DropdownMenuItem>
 
-                    <div className="flex items-center justify-between px-2 py-2">
-                      <span className="text-sm font-medium text-foreground">
-                        Publish
-                      </span>
-                      <Switch
-                        checked={!!publishState[child._id]}
-                        onCheckedChange={() => togglePublish(child._id)}
-                      />
+                      <DropdownMenuItem
+                        onClick={() => handleDeleteProfile(child._id)}
+                        className="cursor-pointer text-destructive focus:text-destructive"
+                      >
+                        <Trash2 size={14} className="mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+
+                      <div className="flex items-center justify-between px-2 py-2">
+                        <span className="text-sm font-medium text-foreground">
+                          Publish
+                        </span>
+                        <Switch
+                          checked={!!publishState[child._id]}
+                          onCheckedChange={() => togglePublish(child._id)}
+                        />
+                      </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <div className="absolute inset-x-0 bottom-0 p-4">
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <h2 className="text-xl font-semibold text-white">
+                        {child.firstName} {child.secondName}
+                      </h2>
+                      <p className="text-sm text-white/80">
+                        {child.age} years old
+                      </p>
                     </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
 
-              <div className="absolute inset-x-0 bottom-0 p-4">
-                <div className="flex items-end justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-semibold text-white">
-                      {child.firstName} {child.secondName}
-                    </h2>
-                    <p className="text-sm text-white/80">
-                      {child.age} years old
-                    </p>
-                  </div>
-
-                  <div className="rounded-full bg-background/15 px-2 py-1 text-xs text-white/90 backdrop-blur-sm">
-                    {getSponsorLabel(child)}
+                    <div className="rounded-full bg-background/15 px-2 py-1 text-xs text-white/90 backdrop-blur-sm">
+                      {getSponsorLabel(child)}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Dialog
         open={isAssignDialogOpen}
@@ -2654,7 +2983,7 @@ export default function ChildrenDashboard() {
                         Estimated graduation year
                       </p>
                       <p className="mt-2 text-base font-semibold text-foreground">
-                        {viewingChild.education?.estimatedGraduationYear ||
+                        {viewingChild.education?.expectedGraduationYear ||
                           "Not provided"}
                       </p>
                     </div>

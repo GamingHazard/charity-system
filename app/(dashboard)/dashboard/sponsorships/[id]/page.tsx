@@ -808,7 +808,11 @@ export default function SponsorDetailPage() {
     setIsArchiving(true);
     setArchiveError("");
     try {
-      await apiRequest("DELETE", `/sponsors/profile/${sponsorId}`);
+      const response = await apiRequest(
+        "DELETE",
+        `/sponsors/profile/${sponsorId}?permanent=true`,
+      );
+      if (!response.ok) throw new Error("Failed to permanently delete sponsor profile.");
       await queryClient.invalidateQueries({
         queryKey: ["sponsors", "profiles", "all"],
       });
@@ -821,14 +825,14 @@ export default function SponsorDetailPage() {
       setIsArchiveDialogOpen(false);
       router.push("/dashboard/sponsorships");
     } catch (error) {
-      console.error("Error archiving sponsor profile:", error);
+      console.error("Error deleting sponsor profile:", error);
       setArchiveError(
-        "Unable to archive this sponsor profile. Please try again.",
+        "Unable to permanently delete this sponsor profile. Please try again.",
       );
       setPageError(
         error instanceof Error
           ? error.message
-          : "Unable to archive this sponsor profile.",
+          : "Unable to permanently delete this sponsor profile.",
       );
     } finally {
       setIsArchiving(false);
@@ -2116,11 +2120,10 @@ export default function SponsorDetailPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete sponsor profile?</AlertDialogTitle>
+            <AlertDialogTitle>Delete sponsor profile permanently?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will release the sponsor&apos;s active children and hide the
-              profile from active lists. Sponsorship and payment history will be
-              preserved.
+              This will permanently delete the sponsor profile and its stored
+              sponsorship and payment history. This action cannot be undone.
             </AlertDialogDescription>
             {archiveError ? (
               <p className="text-sm text-destructive">{archiveError}</p>

@@ -190,11 +190,11 @@ export default function SponsorshipsDashboard() {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sponsorSubmitting, setSponsorSubmitting] = useState(false);
-  const [archiveTarget, setArchiveTarget] = useState<SponsorProfile | null>(
+  const [deleteTarget, setDeleteTarget] = useState<SponsorProfile | null>(
     null,
   );
-  const [isArchiving, setIsArchiving] = useState(false);
-  const [archiveError, setArchiveError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [sponsorFormError, setSponsorFormError] = useState("");
   const [pageError, setPageError] = useState("");
   const [paymentForm, setPaymentForm] = useState(initialPayment);
@@ -410,46 +410,46 @@ export default function SponsorshipsDashboard() {
     }
   };
 
-  const handleArchiveSponsor = async () => {
-    if (!archiveTarget?._id) return;
+  const handleDeleteSponsor = async () => {
+    if (!deleteTarget?._id) return;
 
-    setIsArchiving(true);
-    setArchiveError("");
+    setIsDeleting(true);
+    setDeleteError("");
     setPageError("");
     try {
       const response = await apiRequest(
         "DELETE",
-        `/sponsors/profile/${archiveTarget._id}`,
+        `/sponsors/profile/${deleteTarget._id}?permanent=true`,
       );
-      if (!response.ok) throw new Error("Failed to archive sponsor profile");
+      if (!response.ok) throw new Error("Failed to permanently delete sponsor profile");
       await queryClient.invalidateQueries({
         queryKey: ["sponsors", "profiles", "all"],
       });
       await queryClient.invalidateQueries({
         queryKey: ["children", "profiles"],
       });
-      setArchiveTarget(null);
+      setDeleteTarget(null);
       toast({
-        title: "Sponsor profile archived",
-        description: "The sponsor profile was archived successfully.",
+        title: "Sponsor profile deleted",
+        description: "The sponsor profile was permanently deleted.",
       });
     } catch (error) {
-      console.error("Error archiving sponsor profile:", error);
+      console.error("Error deleting sponsor profile:", error);
       setPageError(
         error instanceof Error
           ? error.message
-          : "Unable to archive this sponsor profile.",
+          : "Unable to permanently delete this sponsor profile.",
       );
-      setArchiveError(
-        "Unable to archive this sponsor profile. Please try again.",
+      setDeleteError(
+        "Unable to permanently delete this sponsor profile. Please try again.",
       );
       toast({
         variant: "destructive",
-        title: "Unable to archive sponsor profile",
+        title: "Unable to delete sponsor profile",
         description: "Please try again.",
       });
     } finally {
-      setIsArchiving(false);
+      setIsDeleting(false);
     }
   };
 
@@ -902,10 +902,10 @@ export default function SponsorshipsDashboard() {
                         variant="outline"
                         size="sm"
                         className="text-destructive hover:text-destructive"
-                        onClick={() => setArchiveTarget(profile)}
+                        onClick={() => setDeleteTarget(profile)}
                       >
                         <Archive className="mr-1 size-4" />
-                        Archive
+                        Delete permanently
                       </Button>
                     </div>
                   </TableCell> */}
@@ -917,43 +917,42 @@ export default function SponsorshipsDashboard() {
       </Card>
 
       <Dialog
-        open={Boolean(archiveTarget)}
+        open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
           if (!open) {
-            setArchiveTarget(null);
-            setArchiveError("");
+            setDeleteTarget(null);
+            setDeleteError("");
           }
         }}
       >
         <DialogContent preventDismiss>
           <DialogHeader>
-            <DialogTitle>Archive sponsor profile?</DialogTitle>
+            <DialogTitle>Delete sponsor profile permanently?</DialogTitle>
             <DialogDescription>
-              This will release the sponsor&apos;s active children and hide the
-              profile from active lists. Sponsorship and payment history will be
-              preserved.
+              This will permanently delete the sponsor profile and its stored
+              sponsorship and payment history. This action cannot be undone.
             </DialogDescription>
-            {archiveError ? (
-              <p className="text-sm text-destructive">{archiveError}</p>
+            {deleteError ? (
+              <p className="text-sm text-destructive">{deleteError}</p>
             ) : null}
           </DialogHeader>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline" disabled={isArchiving}>
+              <Button variant="outline" disabled={isDeleting}>
                 Cancel
               </Button>
             </DialogClose>
             <Button
               variant="destructive"
-              onClick={handleArchiveSponsor}
-              disabled={isArchiving}
+              onClick={handleDeleteSponsor}
+              disabled={isDeleting}
             >
-              {isArchiving ? (
+              {isDeleting ? (
                 <Loader className="mr-2 size-4 animate-spin" />
               ) : (
                 <Archive className="mr-2 size-4" />
               )}
-              {isArchiving ? "Archiving..." : "Archive profile"}
+              {isDeleting ? "Deleting..." : "Delete permanently"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -16,6 +16,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -35,6 +42,7 @@ import type { SponsorshipProfile } from "@/lib/types";
 import {
   ArrowLeft,
   Download,
+  Link2,
   Search,
   Trash2,
   Unlink,
@@ -126,6 +134,14 @@ export default function ChildDetailPage() {
   const [isUnlinkDialogOpen, setIsUnlinkDialogOpen] = useState(false);
   const [isUnlinking, setIsUnlinking] = useState(false);
   const [unlinkError, setUnlinkError] = useState("");
+  const [sponsorOptions, setSponsorOptions] = useState<any[]>([]);
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [selectedSponsorId, setSelectedSponsorId] = useState("");
+  const [sponsorshipStartDate, setSponsorshipStartDate] = useState(
+    new Date().toISOString().slice(0, 10),
+  );
+  const [isLinkingSponsor, setIsLinkingSponsor] = useState(false);
+  const [linkSponsorError, setLinkSponsorError] = useState("");
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportFile, setReportFile] = useState<File | null>(null);
   const [reportPreview, setReportPreview] = useState("");
@@ -210,6 +226,45 @@ export default function ChildDetailPage() {
       isMounted = false;
     };
   }, [childId]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchSponsors = async () => {
+      try {
+        const response = await apiRequest("GET", "/sponsors/profiles/all");
+        if (!response.ok) throw new Error("Unable to load sponsors.");
+        const records = await response.json();
+        const seen = new Set<string>();
+        const options = (Array.isArray(records) ? records : [])
+          .map((record: any) => {
+            const sponsor =
+              record?.profile || record?.sponsor || record?.donor?.sponsor || {};
+            return {
+              _id: String(record?._id || record?.donor?._id || ""),
+              name: sponsor.fullName || sponsor.name || "",
+              email: sponsor.email || "",
+              phone: sponsor.phone || "",
+            };
+          })
+          .filter((option: any) => {
+            const key = `${option.email}-${option.phone}-${option.name}`;
+            if (!option._id || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+
+        if (isMounted) setSponsorOptions(options);
+      } catch (error) {
+        console.error("Error loading sponsors:", error);
+      }
+    };
+
+    fetchSponsors();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const tabs = [
     { key: "overview", label: "Overview" },
@@ -560,6 +615,66 @@ export default function ChildDetailPage() {
       toast({ variant: "destructive", title: "Unable to unlink sponsor", description: "Please try again." });
     } finally {
       setIsUnlinking(false);
+    }
+  };
+
+  const handleLinkSponsor = async () => {
+    if (!profile) return;
+
+    const selectedSponsor = sponsorOptions.find(
+      (option: any) => option._id === selectedSponsorId,
+    );
+    if (!selectedSponsor) {
+      setLinkSponsorError("Please select a sponsor.");
+      return;
+    }
+
+    setIsLinkingSponsor(true);
+    setLinkSponsorError("");
+    try {
+      const response = await apiRequest("PATCH", "/sponsors/reassign", {
+        childId: profile._id,
+        child: profile._id,
+        sponsorId: selectedSponsor._id,
+        sponsor: {
+          name: selectedSponsor.name,
+          email: selectedSponsor.email,
+          phone: selectedSponsor.phone,
+        },
+        location: { address: profile.location || "" },
+        donation: {
+          amount:
+            Number(String(profile.monthlyNeed || "").replace(/[^0-9.]/g, "")) || 0,
+          period: "Monthly",
+          remindByEmail: true,
+        },
+        paymentMethod: "zelle",
+        startDate: sponsorshipStartDate,
+        status: "Active",
+      });
+      if (!response.ok) throw new Error("Failed to link sponsor.");
+      const data = await response.json();
+
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              sponsorshipStatus: "Sponsored",
+              sponsor: data.sponsor || selectedSponsor,
+            }
+          : current,
+      );
+      await queryClient.invalidateQueries({ queryKey: ["children", "profiles"] });
+      await queryClient.invalidateQueries({ queryKey: ["sponsors", "profiles", "all"] });
+      setIsLinkDialogOpen(false);
+      setSelectedSponsorId("");
+      toast({ title: "Sponsor linked", description: "The sponsor was linked to this child successfully." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to link sponsor.";
+      setLinkSponsorError(message);
+      toast({ variant: "destructive", title: "Unable to link sponsor", description: message });
+    } finally {
+      setIsLinkingSponsor(false);
     }
   };
 
@@ -1319,12 +1434,82 @@ export default function ChildDetailPage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-lg border border-dashed border-border bg-background p-4 text-sm text-foreground/70">
-                No sponsor has been assigned to this child yet.
+              <div className="flex flex-col gap-4 rounded-lg border border-dashed border-border bg-background p-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-foreground/70">
+                  No sponsor has been assigned to this child yet.
+                </p>
+                <Button
+                  onClick={() => {
+                    setLinkSponsorError("");
+                    setSelectedSponsorId("");
+                    setSponsorshipStartDate(new Date().toISOString().slice(0, 10));
+                    setIsLinkDialogOpen(true);
+                  }}
+                  disabled={sponsorOptions.length === 0}
+                >
+                  <Link2 className="size-4" />
+                  Link sponsor
+                </Button>
               </div>
             )}
           </div>
         )}
+
+        <Dialog
+          open={isLinkDialogOpen}
+          onOpenChange={(open) => {
+            setIsLinkDialogOpen(open);
+            if (!open) setLinkSponsorError("");
+          }}
+        >
+          <DialogContent className="max-w-lg bg-card">
+            <DialogHeader>
+              <DialogTitle>
+                Link sponsor to {profile.firstName} {profile.secondName}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-5">
+              {linkSponsorError ? (
+                <div className="rounded-lg border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {linkSponsorError}
+                </div>
+              ) : null}
+              <div className="space-y-2">
+                <Label htmlFor="detailSponsor">Choose an existing sponsor</Label>
+                <Select value={selectedSponsorId} onValueChange={setSelectedSponsorId}>
+                  <SelectTrigger id="detailSponsor" className="bg-background">
+                    <SelectValue placeholder="Select a sponsor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sponsorOptions.map((option: any) => (
+                      <SelectItem key={option._id} value={option._id}>
+                        {option.name} ({option.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="detailSponsorshipStartDate">Start date</Label>
+                <Input
+                  id="detailSponsorshipStartDate"
+                  type="date"
+                  className="bg-background"
+                  value={sponsorshipStartDate}
+                  onChange={(event) => setSponsorshipStartDate(event.target.value)}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsLinkDialogOpen(false)} disabled={isLinkingSponsor}>
+                  Cancel
+                </Button>
+                <Button onClick={handleLinkSponsor} disabled={isLinkingSponsor}>
+                  {isLinkingSponsor ? "Linking..." : "Link sponsor"}
+                </Button>
+              </DialogFooter>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <AlertDialog
           open={isUnlinkDialogOpen}

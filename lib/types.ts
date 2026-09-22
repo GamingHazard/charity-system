@@ -58,12 +58,19 @@ export interface SponsorshipProfile {
   monthlyNeed?: string;
   education?: {
     isStudying?: boolean;
+    educationStage?: string;
     currentLevel?: string;
     schoolName?: string;
     classGrade?: string;
     currentClass?: string;
     academicYear?: string;
+    enrollmentDate?: string;
+    courseName?: string;
+    courseDurationValue?: number | string;
+    courseDurationUnit?: "months" | "years" | string;
+    expectedGraduationDate?: string;
     expectedGraduationYear?: string;
+    graduationStage?: string;
     lastTermResult?: string;
     graduationTarget?: string;
     estimatedGraduationYear?: string;
