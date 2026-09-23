@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { Permission } from "@/lib/permissions";
-import { redirect } from "next/navigation";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
 
@@ -15,6 +14,7 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, isLoading, can } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const isProduction = process.env.NODE_ENV === "production";
   const [isDesktop, setIsDesktop] = useState<boolean | null>(
     isProduction ? null : true,
@@ -32,7 +32,13 @@ export default function DashboardLayout({
     return () => mediaQuery.removeEventListener("change", updateViewport);
   }, [isProduction]);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -41,10 +47,6 @@ export default function DashboardLayout({
         </div>
       </div>
     );
-  }
-
-  if (!isAuthenticated) {
-    redirect("/login");
   }
 
   const routePermissions: Array<{

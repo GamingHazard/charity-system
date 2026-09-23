@@ -20,6 +20,23 @@ const quicksand = Quicksand({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Ensigo Of Love| Administration",
+   icons: {
+    icon: [
+      {
+        url: "/dark-logo.jpeg",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/dark-logo.jpeg",
+        media: "(prefers-color-scheme: dark)",
+      },
+      {
+        url: "/dark-logo.jpeg",
+        type: "image/svg+xml",
+      },
+    ],
+    apple: "/dark-logo.jpeg",
+  },
   // description: "Operations dashboard for Seeds of Love Foundation",
 };
 

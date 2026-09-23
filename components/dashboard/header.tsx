@@ -1,16 +1,13 @@
 'use client';
 
 import { useAuth } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 
 export function DashboardHeader() {
   const { user, logout } = useAuth();
-  const router = useRouter();
 
   const handleLogout = () => {
     logout();
-    router.push('/login');
   };
 
   return (
