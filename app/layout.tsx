@@ -19,8 +19,8 @@ const geistMono = Geist_Mono({
 const quicksand = Quicksand({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Charity System | Administration",
-  description: "Operations dashboard for Seeds of Love Foundation",
+  title: "Ensigo Of Love| Administration",
+  // description: "Operations dashboard for Seeds of Love Foundation",
 };
 
 export default function RootLayout({

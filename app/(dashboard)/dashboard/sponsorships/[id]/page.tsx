@@ -1507,7 +1507,7 @@ export default function SponsorDetailPage() {
                       const child = payment.child || {};
                       return (
                         <tr
-                          key={`${payment.transactionId || payment._id || index}`}
+                          key={`${payment._id || payment.transactionId || "payment"}-${index}`}
                           className="border-b border-border last:border-0"
                         >
                           <td className="py-3 pr-4">

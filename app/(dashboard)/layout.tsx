@@ -51,17 +51,13 @@ export default function DashboardLayout({
     prefix: string;
     permission: Permission;
   }> = [
-    { prefix: "/dashboard/analytics", permission: "analytics.view" },
     { prefix: "/dashboard/children", permission: "children.view" },
     { prefix: "/dashboard/sponsorships", permission: "sponsorships.view" },
     { prefix: "/dashboard/staff", permission: "staff.view" },
     { prefix: "/dashboard/blogs", permission: "blogs.view" },
     { prefix: "/dashboard/events", permission: "events.view" },
     { prefix: "/dashboard/gallery", permission: "gallery.view" },
-    { prefix: "/dashboard/content", permission: "content.view" },
     { prefix: "/dashboard/messages", permission: "messages.view" },
-    { prefix: "/dashboard/donations", permission: "donations.view" },
-    { prefix: "/dashboard/settings", permission: "settings.view" },
   ];
   const requiredPermission = routePermissions.find(({ prefix }) =>
     pathname.startsWith(prefix),
