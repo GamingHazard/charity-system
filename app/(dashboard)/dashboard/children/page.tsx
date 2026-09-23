@@ -126,6 +126,7 @@ const educationLevels = [
 const educationClassOptions: Record<string, string[]> = {
   kindergarten: ["Baby", "Middle", "Top"],
   primary: ["P-1", "P-2", "P-3", "P-4", "P-5", "P-6", "P-7"],
+  secondary: ["S-1", "S-2", "S-3", "S-4", "S-5", "S-6"],
   "secondary-o": ["S-1", "S-2", "S-3", "S-4"],
   "secondary-a": ["S-5", "S-6"],
 };
@@ -135,6 +136,10 @@ function normalizeEducationLevel(value?: string) {
   return educationLevels.includes(normalized as (typeof educationLevels)[number])
     ? normalized
     : "";
+}
+
+function textValue(value: unknown) {
+  return typeof value === "string" ? value : "";
 }
 
 type FormState = typeof initialFormState;
@@ -716,10 +721,43 @@ export default function ChildrenDashboard() {
       ]);
       addSection("Education");
       addRows([
+        [
+          "Is studying",
+          child.education?.isStudying === undefined
+            ? "Not provided"
+            : child.education.isStudying
+              ? "Yes"
+              : "No",
+        ],
+        [
+          "Education stage",
+          child.education?.educationStage || child.education?.currentLevel,
+        ],
         ["School", child.education?.schoolName || child.school],
-        ["Current level", child.education?.currentLevel],
-        ["Current class", child.education?.currentClass || child.class],
-        ["Academic year", child.education?.academicYear],
+        ["Class / grade", child.education?.classGrade || child.education?.currentClass || child.class],
+        [
+          "Expected graduation year",
+          child.education?.expectedGraduationYear ||
+            child.education?.estimatedGraduationYear,
+        ],
+        ...(child.education?.educationStage === "vocational" ||
+        child.education?.educationStage === "university"
+          ? ([
+              [
+                "Course start date",
+                child.education?.enrollmentDate
+                  ? formatDisplayDate(child.education.enrollmentDate)
+                  : "Not provided",
+              ],
+              ["Course / program", child.education?.courseName],
+              [
+                "Course duration",
+                child.education?.courseDurationValue
+                  ? `${child.education.courseDurationValue} ${child.education.courseDurationUnit || "months"}`
+                  : "Not provided",
+              ],
+            ] as Array<[string, unknown]>)
+          : []),
       ]);
       addSection("Sponsor details");
       addRows([
@@ -743,10 +781,10 @@ export default function ChildrenDashboard() {
     setEditingChild(child);
     setFormState({
       _id: child._id,
-      name: child.name,
-      firstName: child.firstName,
-      secondName: child.secondName,
-      givenName: child.givenName,
+      name: textValue(child.name),
+      firstName: textValue(child.firstName),
+      secondName: textValue(child.secondName),
+      givenName: textValue(child.givenName),
       gender: child.gender,
       dateOfBirth: child.dateOfBirth,
       age: child.age,
@@ -762,13 +800,13 @@ export default function ChildrenDashboard() {
         url: child.image?.url || "",
         public_id: child.image?.public_id || "",
       },
-      background: child.background,
-      school: child.school,
-      location: child.location,
-      needsInput: child.needs.includes(", ")
-        ? child.needs.split(", ").join(", ")
-        : child.needs,
-      monthlyNeed: child.monthlyNeed,
+      background: textValue(child.background),
+      school: textValue(child.school),
+      location: textValue(child.location),
+      needsInput: Array.isArray(child.needs)
+        ? child.needs.filter(Boolean).join(", ")
+        : textValue(child.needs),
+      monthlyNeed: textValue(child.monthlyNeed),
       education: {
         isStudying:
           child.education?.isStudying ?? Boolean(child.education?.currentLevel),
@@ -989,7 +1027,7 @@ export default function ChildrenDashboard() {
 
   const validateStep = () => {
     if (wizardStep === 1) {
-      if (!formState.firstName.trim() || !formState.secondName.trim()) {
+      if (!textValue(formState.firstName).trim() || !textValue(formState.secondName).trim()) {
         setFormError("Please enter the child’s full name.");
         return false;
       }
@@ -1000,7 +1038,7 @@ export default function ChildrenDashboard() {
     }
 
     if (wizardStep === 3) {
-      if (!formState.location.trim()) {
+      if (!textValue(formState.location).trim()) {
         setFormError("Please provide the child's location.");
         return false;
       }
@@ -1012,7 +1050,7 @@ export default function ChildrenDashboard() {
         setFormError("Please provide the education stage and enrollment date.");
         return false;
       }
-      if (!education.schoolName.trim()) {
+      if (!textValue(education.schoolName).trim()) {
         setFormError("Please provide the school or institution.");
         return false;
       }
@@ -1026,7 +1064,7 @@ export default function ChildrenDashboard() {
       }
       if (
         ["vocational", "university"].includes(education.educationStage) &&
-        (!education.courseName.trim() ||
+        (!textValue(education.courseName).trim() ||
           !Number(education.courseDurationValue) ||
           Number(education.courseDurationValue) <= 0)
       ) {
@@ -1064,7 +1102,8 @@ export default function ChildrenDashboard() {
 
       const nextEducation = {
         ...formState.education,
-        schoolName: formState.education.schoolName || formState.school.trim(),
+        schoolName:
+          textValue(formState.education.schoolName) || textValue(formState.school).trim(),
         classGrade:
           formState.education.classGrade || formState.education.currentClass,
         currentClass:
@@ -1076,9 +1115,10 @@ export default function ChildrenDashboard() {
       };
 
       const payload: any = {
-        firstName: formState.firstName.trim(),
-        secondName: formState.secondName.trim(),
-        givenName: formState.givenName.trim() || formState.firstName.trim(),
+        firstName: textValue(formState.firstName).trim(),
+        secondName: textValue(formState.secondName).trim(),
+        givenName:
+          textValue(formState.givenName).trim() || textValue(formState.firstName).trim(),
         gender: formState.gender,
         dateOfBirth: formState.dateOfBirth,
         age: Number(formState.age) || 0,
@@ -1087,17 +1127,17 @@ export default function ChildrenDashboard() {
         nationality: formState.nationality,
         familyStatus: formState.familyStatus,
         numberOfParents: formState.numberOfParents,
-        guardianName: formState.guardianName.trim(),
-        guardianContact: formState.guardianContact.trim(),
+        guardianName: textValue(formState.guardianName).trim(),
+        guardianContact: textValue(formState.guardianContact).trim(),
         guardianRelation: formState.guardianRelation,
         image: {
           url: formState.image.url || "",
           public_id: formState.image.public_id || "",
         },
-        background: formState.background.trim(),
-        school: formState.school.trim(),
-        location: formState.location.trim(),
-        needs: formState.needsInput
+        background: textValue(formState.background).trim(),
+        school: textValue(formState.school).trim(),
+        location: textValue(formState.location).trim(),
+        needs: textValue(formState.needsInput)
           .split(",")
           .map((item: any) => item.trim())
           .filter(Boolean),
@@ -1158,9 +1198,9 @@ export default function ChildrenDashboard() {
         ...data.profile,
         _id: editingChild ? editingChild._id : data.profile._id,
         name:
-          formState.name.trim() ||
-          `${formState.firstName.trim()} ${formState.secondName.trim()}`,
-        needs: formState.needsInput
+          textValue(formState.name).trim() ||
+          `${textValue(formState.firstName).trim()} ${textValue(formState.secondName).trim()}`,
+        needs: textValue(formState.needsInput)
           .split(",")
           .map((item: any) => item.trim())
           .filter(Boolean),
@@ -2148,7 +2188,10 @@ export default function ChildrenDashboard() {
             <div className="space-y-2">
               <Label htmlFor="classGrade">Class / grade</Label>
               <Select
-                disabled={formState.education.isStudying === false}
+                disabled={
+                  formState.education.isStudying === false ||
+                  !educationClassOptions[formState.education.educationStage]
+                }
                 value={formState.education.classGrade}
                 onValueChange={(value) =>
                   setFormState({
@@ -2980,10 +3023,11 @@ export default function ChildrenDashboard() {
                     </div>
                     <div className="rounded-lg bg-muted p-4">
                       <p className="text-xs uppercase tracking-wide text-foreground/60">
-                        Estimated graduation year
+                        Expected graduation year
                       </p>
                       <p className="mt-2 text-base font-semibold text-foreground">
                         {viewingChild.education?.expectedGraduationYear ||
+                          viewingChild.education?.estimatedGraduationYear ||
                           "Not provided"}
                       </p>
                     </div>

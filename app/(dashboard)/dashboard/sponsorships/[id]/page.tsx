@@ -1383,7 +1383,7 @@ export default function SponsorDetailPage() {
                               {childName}
                             </p>
                             <p className="text-sm text-blue-600 underline">
-                              {entry.frequency || "view profile"}
+                              View child profile
                             </p>
                           </span>
                         </div>
@@ -1395,9 +1395,8 @@ export default function SponsorDetailPage() {
                           </span>
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="destructive"
                             size="sm"
-                            className="text-destructive hover:text-destructive"
                             onClick={(event) => {
                               event.stopPropagation();
                               setUnlinkError("");

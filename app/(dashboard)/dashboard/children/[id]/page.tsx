@@ -152,6 +152,7 @@ export default function ChildDetailPage() {
   const [deletingReportId, setDeletingReportId] = useState("");
   const [downloadingReportId, setDownloadingReportId] = useState("");
   const [isExportingProfile, setIsExportingProfile] = useState(false);
+  const [isExportingHistory, setIsExportingHistory] = useState(false);
 
   useEffect(() => {
     if (!childId) return;
@@ -310,7 +311,9 @@ export default function ChildDetailPage() {
         lastTermResult: profile.education?.lastTermResult || "",
         graduationTarget: profile.education?.graduationTarget || "",
         estimatedGraduationYear:
-          profile.education?.estimatedGraduationYear || "",
+          profile.education?.expectedGraduationYear ||
+          profile.education?.estimatedGraduationYear ||
+          "",
         educationNotes: profile.education?.educationNotes || "",
       },
     });
@@ -919,14 +922,27 @@ export default function ChildDetailPage() {
 
       addSection("Education");
       addTwoColumnRows([
-        ["School", profile.school],
-        ["Class", profile.class],
-        ["Current level", education.currentLevel],
-        ["Academic year", education.academicYear],
-        ["Study status", education.isStudying ? "Currently studying" : "Not provided"],
-        ["Graduation target", education.graduationTarget || education.estimatedGraduationYear],
+        ["Is studying", education.isStudying === undefined ? "Not provided" : education.isStudying ? "Yes" : "No"],
+        ["Education stage", education.educationStage || education.currentLevel],
+        ["School", education.schoolName || profile.school],
+        ["Class / grade", education.classGrade || education.currentClass || profile.class],
+        [
+          "Expected graduation year",
+          education.expectedGraduationYear || education.estimatedGraduationYear,
+        ],
+        ...(education.educationStage === "vocational" || education.educationStage === "university"
+          ? ([
+              ["Course start date", education.enrollmentDate ? formatDisplayDate(education.enrollmentDate) : "Not provided"],
+              ["Course / program", education.courseName],
+              [
+                "Course duration",
+                education.courseDurationValue
+                  ? `${education.courseDurationValue} ${education.courseDurationUnit || "months"}`
+                  : "Not provided",
+              ],
+            ] as Array<[string, unknown]>)
+          : []),
       ]);
-      addParagraph("Education notes", education.educationNotes);
 
       addSection("Sponsor Details");
       addTwoColumnRows([
@@ -992,6 +1008,264 @@ export default function ChildDetailPage() {
       );
     } finally {
       setIsExportingProfile(false);
+    }
+  };
+
+  const exportSponsorshipHistoryPdf = async () => {
+    if (!profile) return;
+
+    setIsExportingHistory(true);
+
+    try {
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 16;
+      const contentWidth = pageWidth - margin * 2;
+      const footerY = pageHeight - 10;
+      const usableBottom = pageHeight - 18;
+      const colors = {
+        ink: [28, 36, 33] as [number, number, number],
+        muted: [102, 112, 107] as [number, number, number],
+        accent: [47, 112, 94] as [number, number, number],
+        pale: [241, 245, 242] as [number, number, number],
+        line: [218, 225, 220] as [number, number, number],
+      };
+      const displayValue = (value: unknown) => {
+        const text = String(value ?? "").trim();
+        return text || "Not provided";
+      };
+      const fullName = [profile.firstName, profile.secondName, profile.givenName]
+        .filter(Boolean)
+        .join(" ");
+      const setText = (color: [number, number, number]) => pdf.setTextColor(...color);
+      let cursor = margin;
+
+      const addFooter = () => {
+        pdf.setDrawColor(...colors.line);
+        pdf.setLineWidth(0.2);
+        pdf.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+        setText(colors.muted);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7.5);
+        pdf.text("Confidential sponsorship history", margin, footerY);
+        pdf.text(`Page ${pdf.getNumberOfPages()}`, pageWidth - margin, footerY, {
+          align: "right",
+        });
+      };
+      const startPage = () => {
+        if (pdf.getNumberOfPages() > 0) addFooter();
+        pdf.addPage();
+        cursor = margin;
+      };
+      const ensureSpace = (height: number) => {
+        if (cursor + height > usableBottom) startPage();
+      };
+      const addSection = (title: string) => {
+        ensureSpace(17);
+        cursor += 4;
+        setText(colors.accent);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(13);
+        pdf.text(title.toUpperCase(), margin, cursor);
+        pdf.setDrawColor(...colors.accent);
+        pdf.setLineWidth(0.8);
+        pdf.line(margin, cursor + 4, pageWidth - margin, cursor + 4);
+        cursor += 12;
+      };
+      const addRow = (label: string, value: unknown) => {
+        const lines = pdf.splitTextToSize(displayValue(value), contentWidth - 48);
+        ensureSpace(Math.max(9, lines.length * 4 + 6));
+        setText(colors.muted);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8);
+        pdf.text(label.toUpperCase(), margin, cursor);
+        setText(colors.ink);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9);
+        pdf.text(lines, margin + 48, cursor);
+        cursor += Math.max(9, lines.length * 4 + 4);
+      };
+      const addTwoColumnRows = (rows: Array<[string, unknown]>) => {
+        for (let index = 0; index < rows.length; index += 2) {
+          ensureSpace(13);
+          const columnWidth = contentWidth / 2 - 5;
+          rows.slice(index, index + 2).forEach(([label, value], offset) => {
+            const x = margin + offset * (contentWidth / 2 + 5);
+            setText(colors.muted);
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(7.5);
+            pdf.text(label.toUpperCase(), x, cursor);
+            setText(colors.ink);
+            pdf.setFont("helvetica", "normal");
+            pdf.setFontSize(9);
+            pdf.text(pdf.splitTextToSize(displayValue(value), columnWidth), x, cursor + 5);
+          });
+          cursor += 14;
+        }
+      };
+      const addPaymentTable = (payments: Array<{ payment: any; sponsor: string }>) => {
+        const columns: Array<[string, number]> = [
+          ["Date", 25],
+          ["Sponsor", 38],
+          ["Amount", 30],
+          ["Method", 25],
+          ["Status", 25],
+          ["Reference", 35],
+        ];
+        const drawHeader = () => {
+          pdf.setFillColor(...colors.accent);
+          pdf.rect(margin, cursor - 4, contentWidth, 8, "F");
+          let x = margin;
+          setText([255, 255, 255]);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(7);
+          columns.forEach(([label, width]) => {
+            pdf.text(label.toUpperCase(), x + 2, cursor + 1);
+            x += width;
+          });
+          cursor += 9;
+        };
+
+        drawHeader();
+        payments.forEach(({ payment, sponsor }, index) => {
+          const values = [
+            formatDisplayDate(payment.date),
+            sponsor,
+            `${displayValue(payment.amount)} ${displayValue(payment.currency || "UGX")}`,
+            payment.method,
+            payment.status || "Completed",
+            payment.transactionId || "No reference",
+          ];
+          const lines = values.map((value, columnIndex) =>
+            pdf.splitTextToSize(displayValue(value), columns[columnIndex][1] - 4),
+          );
+          const rowHeight = Math.max(10, ...lines.map((row) => row.length * 3.5 + 5));
+
+          if (cursor + rowHeight > usableBottom) {
+            startPage();
+            addSection("Payment ledger (continued)");
+            drawHeader();
+          }
+
+          if (index % 2 === 0) {
+            pdf.setFillColor(...colors.pale);
+            pdf.rect(margin, cursor - 4, contentWidth, rowHeight, "F");
+          }
+          let x = margin;
+          setText(colors.ink);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(7.5);
+          lines.forEach((cellLines, columnIndex) => {
+            pdf.text(cellLines, x + 2, cursor + 1);
+            x += columns[columnIndex][1];
+          });
+          cursor += rowHeight;
+        });
+      };
+      const donorName = (record: any) => {
+        const donor = record.donor || {};
+        return donor.profile?.fullName || donor.sponsor?.name || donor.name || "Unknown sponsor";
+      };
+      const allPayments = history.flatMap((record: any) =>
+        Array.isArray(record.payments)
+          ? record.payments.map((payment: any) => ({ payment, sponsor: donorName(record) }))
+          : [],
+      );
+      const totalPayments = allPayments.reduce(
+        (total: number, { payment }: { payment: any }) => total + Number(payment.amount || 0),
+        0,
+      );
+
+      const logo = await loadPdfImage("/dark-logo.jpeg");
+      const logoSize = 9;
+      const logoScale = Math.min(logoSize / logo.width, logoSize / logo.height);
+      pdf.addImage(
+        logo.dataUrl,
+        logo.format,
+        margin,
+        cursor - 5,
+        logo.width * logoScale,
+        logo.height * logoScale,
+      );
+      setText(colors.accent);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.text("ENSIGO OF LOVE FOUNDATION", margin + logoSize + 3, cursor);
+      setText(colors.muted);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.text(formatDisplayDate(new Date()), pageWidth - margin, cursor, { align: "right" });
+      cursor += 16;
+      setText(colors.ink);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(22);
+      pdf.text("SPONSORSHIP HISTORY", margin, cursor);
+      cursor += 8;
+      setText(colors.muted);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text("A complete record of sponsorship activity and payments.", margin, cursor);
+      cursor += 12;
+
+      addSection("Child profile");
+      addTwoColumnRows([
+        ["Child", fullName],
+        ["Child ID", profile._id],
+        ["Sponsorship status", profile.sponsorshipStatus],
+        ["Number of sponsorships", history.length],
+      ]);
+
+      addSection("Sponsorship records");
+      if (history.length === 0) {
+        addRow("History", "No sponsorship history is available for this child.");
+      } else {
+        history.forEach((record: any, index: number) => {
+          const donor = record.donor || {};
+          const amount = Number(record.amount ?? donor.donation?.amount ?? 0);
+          ensureSpace(38);
+          pdf.setFillColor(...colors.pale);
+          pdf.roundedRect(margin, cursor - 4, contentWidth, 30, 2, 2, "F");
+          setText(colors.ink);
+          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(10);
+          pdf.text(`${index + 1}. ${donorName(record)}`, margin + 5, cursor + 2);
+          setText(colors.muted);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(8.5);
+          pdf.text(`Status: ${displayValue(record.status || "Pending")}`, margin + 5, cursor + 8);
+          pdf.text(`Frequency: ${displayValue(record.frequency || donor.donation?.period || "Monthly")}`, margin + 5, cursor + 14);
+          pdf.text(`Started: ${formatDisplayDate(record.startDate)}`, margin + 5, cursor + 20);
+          pdf.text(`Amount: ${amount.toLocaleString()} ${displayValue(record.currency || "USD")}`, pageWidth - margin - 5, cursor + 8, { align: "right" });
+          pdf.text(`Payments: ${Array.isArray(record.payments) ? record.payments.length : 0}`, pageWidth - margin - 5, cursor + 14, { align: "right" });
+          cursor += 36;
+        });
+      }
+
+      addSection("Payment ledger");
+      if (allPayments.length === 0) {
+        addRow("Payments", "No payment records are available.");
+      } else {
+        addPaymentTable(allPayments);
+      }
+      addSection("Summary");
+      addTwoColumnRows([
+        ["Sponsorship records", history.length],
+        ["Payment records", allPayments.length],
+        ["Total recorded payments", `${totalPayments.toLocaleString()} UGX`],
+        ["Report generated", formatDisplayDate(new Date())],
+      ]);
+      addFooter();
+      pdf.save(`sponsorship-history-${profile._id}.pdf`);
+    } catch (error) {
+      console.error("Error exporting sponsorship history:", error);
+      toast({
+        variant: "destructive",
+        title: "Unable to export sponsorship history",
+        description: "Please try again.",
+      });
+    } finally {
+      setIsExportingHistory(false);
     }
   };
 
@@ -1230,28 +1504,32 @@ export default function ChildDetailPage() {
         {activeTab === "education" && (
           <div className="space-y-4 rounded-xl border border-border bg-card p-4">
             <h3 className="text-lg font-semibold text-foreground">
-              Education tracking
+              Education details
             </h3>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-xs uppercase tracking-wide text-foreground/60">
-                  Current level
+                  Is studying
                 </p>
                 <p className="mt-2 text-base font-semibold text-foreground">
-                  {education.currentLevel || "Not provided"}
+                  {education.isStudying === undefined
+                    ? "Not provided"
+                    : education.isStudying
+                      ? "Yes"
+                      : "No"}
                 </p>
               </div>
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-xs uppercase tracking-wide text-foreground/60">
-                  Current class
+                  Education stage
                 </p>
                 <p className="mt-2 text-base font-semibold text-foreground">
-                  {education.currentClass || "Not provided"}
+                  {education.educationStage || "Not provided"}
                 </p>
               </div>
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-xs uppercase tracking-wide text-foreground/60">
-                  School
+                  Name of school
                 </p>
                 <p className="mt-2 text-base font-semibold text-foreground">
                   {education.schoolName || profile.school || "Not provided"}
@@ -1259,37 +1537,56 @@ export default function ChildDetailPage() {
               </div>
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-xs uppercase tracking-wide text-foreground/60">
-                  Academic year
+                  Class / grade
                 </p>
                 <p className="mt-2 text-base font-semibold text-foreground">
-                  {education.academicYear || "Not provided"}
+                  {education.classGrade || education.currentClass || "Not provided"}
                 </p>
               </div>
               <div className="rounded-lg bg-muted p-4">
                 <p className="text-xs uppercase tracking-wide text-foreground/60">
-                  Last term result
-                </p>
-                {/* <p className="mt-2 text-base font-semibold text-foreground">
-                  {education.lastTermResult || "Not provided"}
-                </p> */}
-              </div>
-              <div className="rounded-lg bg-muted p-4">
-                <p className="text-xs uppercase tracking-wide text-foreground/60">
-                  Estimated graduation
+                  Expected graduation year
                 </p>
                 <p className="mt-2 text-base font-semibold text-foreground">
-                  {education.estimatedGraduationYear || "Not provided"}
+                  {education.expectedGraduationYear ||
+                    education.estimatedGraduationYear ||
+                    "Not provided"}
                 </p>
               </div>
+              {education.educationStage === "vocational" ||
+              education.educationStage === "university" ? (
+                <>
+                  <div className="rounded-lg bg-muted p-4">
+                    <p className="text-xs uppercase tracking-wide text-foreground/60">
+                      Course start date
+                    </p>
+                    <p className="mt-2 text-base font-semibold text-foreground">
+                      {education.enrollmentDate
+                        ? formatDisplayDate(education.enrollmentDate)
+                        : "Not provided"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-muted p-4">
+                    <p className="text-xs uppercase tracking-wide text-foreground/60">
+                      Course / program
+                    </p>
+                    <p className="mt-2 text-base font-semibold text-foreground">
+                      {education.courseName || "Not provided"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-muted p-4">
+                    <p className="text-xs uppercase tracking-wide text-foreground/60">
+                      Course duration
+                    </p>
+                    <p className="mt-2 text-base font-semibold text-foreground">
+                      {education.courseDurationValue
+                        ? `${education.courseDurationValue} ${education.courseDurationUnit || "months"}`
+                        : "Not provided"}
+                    </p>
+                  </div>
+                </>
+              ) : null}
             </div>
-            {/* <div className="rounded-lg bg-muted p-4">
-              <p className="text-xs uppercase tracking-wide text-foreground/60">
-                Education notes
-              </p>
-              <p className="mt-2 text-sm leading-6 text-foreground/80">
-                {education.educationNotes || "No additional notes"}
-              </p>
-            </div> */}
           </div>
         )}
 
@@ -1552,9 +1849,20 @@ export default function ChildDetailPage() {
 
         {activeTab === "history" && (
           <div className="rounded-xl border border-border bg-card p-4">
-            <h3 className="mb-3 text-lg font-semibold text-foreground">
-              Sponsorship history
-            </h3>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-lg font-semibold text-foreground">
+                Sponsorship history
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void exportSponsorshipHistoryPdf()}
+                disabled={isExportingHistory || historyLoading}
+              >
+                <Download className="mr-2 size-4" />
+                {isExportingHistory ? "Exporting..." : "Export PDF"}
+              </Button>
+            </div>
             {historyLoading ? (
               <div className="space-y-3">
                 <div className="h-12 animate-pulse rounded-lg bg-muted" />
