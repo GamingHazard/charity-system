@@ -1268,7 +1268,7 @@ export default function SponsorshipsDashboard() {
 
               <div className="flex items-center gap-2">
                 <input 
-                className = {`bg-background`}
+                
                   id="remindByEmail"
                   type="checkbox"
                   checked={sponsorForm.remindByEmail}
@@ -1278,7 +1278,7 @@ export default function SponsorshipsDashboard() {
                       remindByEmail: event.target.checked,
                     })
                   }
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  className="h-4 w-4 bg-background rounded border-border text-primary focus:ring-primary"
                 />
                 <Label  htmlFor="remindByEmail">Send reminders by email</Label>
               </div>
