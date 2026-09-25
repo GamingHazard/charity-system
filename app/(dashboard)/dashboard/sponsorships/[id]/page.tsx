@@ -1133,23 +1133,25 @@ export default function SponsorDetailPage() {
   const plegedFrequency = sponsor?.donation?.period || "Monthly";
 
   return (
-    <div className="p-8 relative">
-      <Button
-        onClick={() => router.push("/dashboard/sponsorships")}
-        className="mb-6 bg-accent text-white hover:bg-accent/90"
-      >
-        <ArrowLeft className="mr-2" size={16} /> Back to sponsorships
-      </Button>
-      <Button
-        className="absolute top-10 right-3"
-        onClick={() => void exportSponsorProfilePdf()}
-        disabled={isExportingProfile}
-      >
-        <Download className="mr-2 size-4" />
-        {isExportingProfile ? "Preparing PDF..." : "Export profile"}
-      </Button>
+    <div className="min-w-0 p-4 sm:p-6 lg:p-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Button
+          onClick={() => router.push("/dashboard/sponsorships")}
+          className="w-full bg-accent text-white hover:bg-accent/90 sm:w-auto"
+        >
+          <ArrowLeft className="mr-2" size={16} /> Back to sponsorships
+        </Button>
+        <Button
+          className="w-full sm:w-auto"
+          onClick={() => void exportSponsorProfilePdf()}
+          disabled={isExportingProfile}
+        >
+          <Download className="mr-2 size-4" />
+          {isExportingProfile ? "Preparing PDF..." : "Export profile"}
+        </Button>
+      </div>
 
-      <div className="mt-2 grid gap-6 lg:grid-cols-[320px_1fr]">
+      <div className="mt-2 grid min-w-0 gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           <div className="relative h-full min-h-80">
             <img
@@ -1183,24 +1185,24 @@ export default function SponsorDetailPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-start sm:justify-between">
-            <div>
+          <div className="flex min-w-0 flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <p className="text-xs uppercase tracking-[0.3em] text-foreground/50">
                 Sponsor profile
               </p>
-              <h1 className="mt-2 text-3xl font-bold text-foreground">
+              <h1 className="mt-2 break-words text-3xl font-bold text-foreground">
                 {sponsorName}
               </h1>
               <p className="mt-2 text-sm text-foreground/70">{cityState}</p>
             </div>
 
-            <div className="flex items-center gap-2 self-start">
-              <Button variant="secondary" onClick={openEditDialog}>
+            <div className="flex w-full flex-col gap-2 self-start sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+              <Button variant="secondary" className="w-full sm:w-auto" onClick={openEditDialog}>
                 Edit profile
               </Button>
               <Button
                 variant="outline"
-                className="text-destructive hover:text-destructive"
+                className="w-full text-destructive hover:text-destructive sm:w-auto"
                 onClick={() => setIsArchiveDialogOpen(true)}
               >
                 <Archive className="mr-2 size-4" />
@@ -1219,7 +1221,7 @@ export default function SponsorDetailPage() {
               <p className="text-xs uppercase tracking-wide text-foreground/60">
                 Email
               </p>
-              <p className="mt-1 text-base font-semibold text-foreground">
+              <p className="mt-1 break-all text-base font-semibold text-foreground">
                 {email}
               </p>
             </div>
@@ -1370,16 +1372,15 @@ export default function SponsorDetailPage() {
                       }}
                       className="w-full cursor-pointer rounded-lg border border-border bg-muted/40 p-4 text-left transition hover:bg-muted/60"
                     >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center justify-center gap-2 cursor-pointer">
+                      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-center justify-center gap-2 cursor-pointer">
                           <img
                             src={childImg}
                             alt={childName}
                             className="size-16 rounded-full object-cover"
                           />
-                          <span>
-                            {" "}
-                            <p className="font-semibold text-accent">
+                          <span className="min-w-0">
+                            <p className="break-words font-semibold text-accent">
                               {childName}
                             </p>
                             <p className="text-sm text-blue-600 underline">
@@ -1387,9 +1388,9 @@ export default function SponsorDetailPage() {
                             </p>
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
                           <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(status)}`}
+                            className={`inline-flex justify-center rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(status)}`}
                           >
                             {status}
                           </span>
@@ -1489,8 +1490,9 @@ export default function SponsorDetailPage() {
             </div>
 
             {paymentHistory.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+              <>
+              <div className="hidden max-w-full overflow-x-auto md:block">
+                <table className="min-w-[680px] w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-border text-foreground/70">
                       <th className="pb-2 pr-4">Date</th>
@@ -1544,6 +1546,70 @@ export default function SponsorDetailPage() {
                   </tbody>
                 </table>
               </div>
+              <div className="space-y-3 md:hidden">
+                {paymentHistory.map((payment: any, index: number) => {
+                  const child = payment.child || {};
+                  return (
+                    <article
+                      key={`${payment._id || payment.transactionId || "payment"}-mobile-${index}`}
+                      className="rounded-lg border border-border bg-muted/30 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            Child
+                          </p>
+                          <p className="break-words font-semibold text-foreground">
+                            {child.firstName || child.name || payment.childName || "No child"}
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${getStatusBadgeClass(payment.status)}`}
+                        >
+                          {payment.status || "Completed"}
+                        </span>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Date</p>
+                          <p className="mt-1 text-foreground/80">
+                            {payment.date
+                              ? new Date(payment.date).toLocaleDateString()
+                              : "Not provided"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Amount</p>
+                          <p className="mt-1 font-semibold text-foreground">
+                            ${Number(payment.amount || 0)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Method</p>
+                          <p className="mt-1 break-words text-foreground/80">
+                            {payment.method || payment.paymentMethod || "Not provided"}
+                          </p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Transaction ID</p>
+                          <p className="mt-1 break-all text-foreground/80">
+                            {payment.transactionId || "Not provided"}
+                          </p>
+                        </div>
+                      </div>
+                      {payment.notes ? (
+                        <div className="mt-3 border-t border-border pt-3">
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Note</p>
+                          <p className="mt-1 break-words text-sm text-foreground/80">
+                            {payment.notes}
+                          </p>
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+              </>
             ) : (
               <div className="rounded-lg border border-dashed border-border bg-background p-4 text-sm text-foreground/70">
                 No payment history is available for this sponsor yet.

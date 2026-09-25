@@ -44,6 +44,9 @@ import {
 import type { PaymentRecord, SponsorshipRecord } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
+import { ListPagination } from "@/components/dashboard/list-pagination";
+
+const PAGE_SIZE = 25;
 
 type SponsorshipStatus = SponsorshipRecord["status"];
 type PaymentStatus = PaymentRecord["status"];
@@ -155,14 +158,27 @@ function getStatusClasses(status: SponsorshipStatus | string) {
 export default function SponsorshipsDashboard() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
   const { data: sponsorships, isLoading } = useQuery<SponsorProfile[]>({
-    queryKey: ["sponsors", "profiles", "all"],
+    queryKey: ["sponsors", "profiles", "all", page],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/sponsors/profiles/all?page=${page}&limit=${PAGE_SIZE}`);
+      return response.json();
+    },
   });
   const { data: childrenData = [] } = useQuery<any[]>({
-    queryKey: ["children", "profiles"],
+    queryKey: ["children", "profiles", page],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/children/profiles?page=${page}&limit=${PAGE_SIZE}`);
+      return response.json();
+    },
   });
   const { data: sponsorshipRecords = emptySponsorshipRecords } = useQuery<SponsorshipRecord[]>({
-    queryKey: ["sponsors", "sponsorship", "records"],
+    queryKey: ["sponsors", "sponsorship", "records", page],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/sponsors/sponsorship/records?page=${page}&limit=${PAGE_SIZE}`);
+      return response.json();
+    },
   });
 
   const [records, setRecords] = useState<SponsorshipRecord[]>([]);
@@ -559,7 +575,7 @@ export default function SponsorshipsDashboard() {
   };
 
   return (
-    <div className="p-8">
+    <div className="min-w-0 p-4 sm:p-6 lg:p-8">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">
@@ -572,6 +588,11 @@ export default function SponsorshipsDashboard() {
             Track donors, payment history, and active sponsorship plans in one
             place.
           </p>
+          <ListPagination
+            page={page}
+            hasNextPage={sponsorProfiles.length === PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </div>
         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
           <Button
@@ -589,7 +610,7 @@ export default function SponsorshipsDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3 mb-8">
+      <div className="mb-8 grid gap-4 sm:gap-6 lg:grid-cols-3">
         {isLoading ? (
           <>
             <Card className="p-6 bg-card border-border">
@@ -666,12 +687,13 @@ export default function SponsorshipsDashboard() {
       </div>
 
       {!isLoading && (
-        <Card className="p-6 mb-8 bg-card border-border">
+        <Card className="mb-8 border-border bg-card p-4 sm:p-6">
           <div className="grid gap-4 md:grid-cols-[1fr_auto] items-end">
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="search">Search sponsors</Label>
-                <Input
+                <Label  htmlFor="search">Search sponsors</Label>
+                <Input 
+                className = {`bg-background`}
                   id="search"
                   value={searchQuery}
                   placeholder="Search by name, email, or location"
@@ -679,7 +701,7 @@ export default function SponsorshipsDashboard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="statusFilter">Status</Label>
+                <Label  htmlFor="statusFilter">Status</Label>
                 <Select
                   value={statusFilter}
                   onValueChange={(value) =>
@@ -697,7 +719,7 @@ export default function SponsorshipsDashboard() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Records</Label>
+                <Label >Records</Label>
                 <p className="text-sm text-foreground/70">
                   {filteredRecords.length} sponsor profiles
                 </p>
@@ -707,9 +729,10 @@ export default function SponsorshipsDashboard() {
         </Card>
       )}
 
-      <Card className="overflow-hidden bg-card border-border">
+      <Card className="min-w-0 overflow-hidden border-border bg-card">
         {isLoading ? (
-          <Table>
+          <div className="hidden max-w-full overflow-x-auto md:block">
+          <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Sponsor</TableHead>
@@ -746,8 +769,10 @@ export default function SponsorshipsDashboard() {
               ))}
             </TableBody>
           </Table>
+          </div>
         ) : (
-          <Table>
+          <div className="hidden max-w-full overflow-x-auto md:block">
+          <Table className="min-w-[760px]">
             <TableHeader>
               <TableRow>
                 <TableHead className="font-bold text-primary">
@@ -840,6 +865,90 @@ export default function SponsorshipsDashboard() {
               ))}
             </TableBody>
           </Table>
+          </div>
+        )}
+        {isLoading ? (
+          <div className="space-y-3 p-4 md:hidden">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="rounded-lg border border-border p-4">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="mt-3 h-4 w-56" />
+                <Skeleton className="mt-2 h-4 w-32" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3 p-4 md:hidden">
+            {filteredRecords.map((profile, index) => (
+              <button
+                key={profile._id || index}
+                type="button"
+                onClick={() => openDetail(profile)}
+                className="w-full rounded-lg border border-border bg-background p-4 text-left transition-colors hover:bg-muted/50"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words font-semibold text-foreground">
+                      {profile.profile?.fullName || "Unnamed sponsor"}
+                    </p>
+                    <p className="mt-1 break-all text-sm text-foreground/70">
+                      {profile.profile?.email || "No email"}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${getStatusClasses(profile.profileStatus || "Incomplete")}`}
+                  >
+                    {profile.profileStatus || "Incomplete"}
+                  </span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Phone
+                    </p>
+                    <p className="mt-1 break-words text-foreground/80">
+                      {profile.profile?.phone || "No phone"}
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Location
+                    </p>
+                    <p className="mt-1 break-words text-foreground/80">
+                      {[
+                        profile.location?.city,
+                        profile.location?.state,
+                        profile.location?.country,
+                      ]
+                        .filter(Boolean)
+                        .join(", ") || "No location"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Donation
+                    </p>
+                    <p className="mt-1 font-medium text-foreground">
+                      ${Number(profile.donation?.amount || 0)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Period
+                    </p>
+                    <p className="mt-1 text-foreground/80">
+                      {profile.donation?.period || "Not provided"}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            ))}
+            {filteredRecords.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                No sponsor profiles match the current filters.
+              </p>
+            ) : null}
+          </div>
         )}
       </Card>
 
@@ -852,7 +961,7 @@ export default function SponsorshipsDashboard() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-sm bg-card">
           <DialogHeader>
             <DialogTitle>Archive sponsor profile?</DialogTitle>
             <DialogDescription>
@@ -887,7 +996,7 @@ export default function SponsorshipsDashboard() {
       </Dialog>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] bg-card overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create sponsor profile</DialogTitle>
             <DialogDescription>
@@ -899,15 +1008,16 @@ export default function SponsorshipsDashboard() {
           <div className="space-y-6 py-2">
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-sm font-medium text-muted-foreground">
                   Sponsor basics
                 </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="sponsorName">Full name</Label>
-                  <Input
+                  <Label  htmlFor="sponsorName">Full name</Label>
+                  <Input 
+                  className = {`bg-background`}
                     id="sponsorName"
                     value={sponsorForm.name}
                     onChange={(event) =>
@@ -920,8 +1030,9 @@ export default function SponsorshipsDashboard() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sponsorEmail">Email</Label>
-                  <Input
+                  <Label  htmlFor="sponsorEmail">Email</Label>
+                  <Input 
+                  className = {`bg-background`}
                     id="sponsorEmail"
                     type="email"
                     value={sponsorForm.email}
@@ -938,8 +1049,9 @@ export default function SponsorshipsDashboard() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="sponsorPhone">Phone</Label>
-                  <Input
+                  <Label  htmlFor="sponsorPhone">Phone</Label>
+                  <Input 
+                  className = {`bg-background`}
                     id="sponsorPhone"
                     value={sponsorForm.phone}
                     onChange={(event) =>
@@ -952,8 +1064,9 @@ export default function SponsorshipsDashboard() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sponsorCountry">Country of origin</Label>
-                  <Input
+                  <Label  htmlFor="sponsorCountry">Country of origin</Label>
+                  <Input 
+                  className = {`bg-background`}
                     id="sponsorCountry"
                     value={sponsorForm.country}
                     onChange={(event) =>
@@ -966,14 +1079,14 @@ export default function SponsorshipsDashboard() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sponsorPaymentMethod">Payment method</Label>
+                  <Label  className="text-muted-foreground" htmlFor="sponsorPaymentMethod">Payment method</Label>
                   <Select
                     value={sponsorForm.paymentMethod}
                     onValueChange={(value) =>
                       setSponsorForm({ ...sponsorForm, paymentMethod: value })
                     }
                   >
-                    <SelectTrigger id="sponsorPaymentMethod" className="w-full">
+                    <SelectTrigger id="sponsorPaymentMethod" className="w-full bg-background">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -991,13 +1104,14 @@ export default function SponsorshipsDashboard() {
 
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-medium text-foreground">Location</p>
+                <p className="text-sm font-medium text-muted-foreground">Location</p>
               </div>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="sponsorAddress">Address</Label>
-                  <Input
+                  <Label  htmlFor="sponsorAddress">Address</Label>
+                  <Input 
+                  className = {`bg-background`}
                     id="sponsorAddress"
                     value={sponsorForm.address}
                     onChange={(event) =>
@@ -1011,8 +1125,9 @@ export default function SponsorshipsDashboard() {
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="sponsorCity">City</Label>
-                    <Input
+                    <Label  htmlFor="sponsorCity">City</Label>
+                    <Input 
+                    className = {`bg-background`}
                       id="sponsorCity"
                       value={sponsorForm.city}
                       onChange={(event) =>
@@ -1025,8 +1140,9 @@ export default function SponsorshipsDashboard() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sponsorState">State</Label>
-                    <Input
+                    <Label  htmlFor="sponsorState">State</Label>
+                    <Input 
+                    className = {`bg-background`}
                       id="sponsorState"
                       value={sponsorForm.state}
                       onChange={(event) =>
@@ -1041,8 +1157,9 @@ export default function SponsorshipsDashboard() {
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="sponsorRegion">Region</Label>
-                    <Input
+                    <Label  htmlFor="sponsorRegion">Region</Label>
+                    <Input 
+                    className = {`bg-background`}
                       id="sponsorRegion"
                       value={sponsorForm.region}
                       onChange={(event) =>
@@ -1055,8 +1172,9 @@ export default function SponsorshipsDashboard() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sponsorZipCode">Zip code</Label>
-                    <Input
+                    <Label  htmlFor="sponsorZipCode">Zip code</Label>
+                    <Input 
+                    className = {`bg-background`}
                       id="sponsorZipCode"
                       value={sponsorForm.zipCode}
                       onChange={(event) =>
@@ -1070,7 +1188,7 @@ export default function SponsorshipsDashboard() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sponsorBio">Bio</Label>
+                  <Label  htmlFor="sponsorBio">Bio</Label>
                   <textarea
                     id="sponsorBio"
                     value={sponsorForm.bio}
@@ -1089,15 +1207,16 @@ export default function SponsorshipsDashboard() {
 
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-sm font-medium text-muted-foreground">
                   Donation details
                 </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="sponsorAmount">Amount</Label>
-                  <Input
+                  <Label  htmlFor="sponsorAmount">Amount</Label>
+                  <Input 
+                  className = {`bg-background`}
                     id="sponsorAmount"
                     type="number"
                     value={sponsorForm.amount}
@@ -1111,14 +1230,14 @@ export default function SponsorshipsDashboard() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sponsorPeriod">Period</Label>
+                  <Label  htmlFor="sponsorPeriod">Period</Label>
                   <Select
                     value={sponsorForm.period}
                     onValueChange={(value) =>
                       setSponsorForm({ ...sponsorForm, period: value })
                     }
                   >
-                    <SelectTrigger id="sponsorPeriod" className="w-full">
+                    <SelectTrigger id="sponsorPeriod" className="w-full bg-background">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1132,8 +1251,9 @@ export default function SponsorshipsDashboard() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sponsorStartDate">Start date</Label>
-                <Input
+                <Label className="text-muted-foreground" htmlFor="sponsorStartDate">Start date</Label>
+                <Input 
+                className = {`bg-background`}
                   id="sponsorStartDate"
                   type="date"
                   value={sponsorForm.startDate}
@@ -1147,7 +1267,8 @@ export default function SponsorshipsDashboard() {
               </div>
 
               <div className="flex items-center gap-2">
-                <input
+                <input 
+                className = {`bg-background`}
                   id="remindByEmail"
                   type="checkbox"
                   checked={sponsorForm.remindByEmail}
@@ -1159,26 +1280,26 @@ export default function SponsorshipsDashboard() {
                   }
                   className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                 />
-                <Label htmlFor="remindByEmail">Send reminders by email</Label>
+                <Label  htmlFor="remindByEmail">Send reminders by email</Label>
               </div>
             </div>
 
             <div className="space-y-4">
               <div>
-                <p className="text-sm font-medium text-foreground">
+                <p className="text-sm font-medium text-muted-foreground">
                   Optional child assignment
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sponsorChild">Link to child</Label>
+                <Label  htmlFor="sponsorChild">Link to child</Label>
                 <Select
                   value={sponsorForm.childId}
                   onValueChange={(value) =>
                     setSponsorForm({ ...sponsorForm, childId: value })
                   }
                 >
-                  <SelectTrigger id="sponsorChild" className="w-full">
+                  <SelectTrigger id="sponsorChild" className="w-full bg-background">
                     <SelectValue placeholder="Select a child (optional)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1233,8 +1354,9 @@ export default function SponsorshipsDashboard() {
           </DialogHeader>
           <div className="grid gap-4 py-2 md:grid-cols-2">
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="editSponsorName">Full name</Label>
-              <Input
+              <Label  htmlFor="editSponsorName">Full name</Label>
+              <Input 
+              className = {`bg-background`}
                 id="editSponsorName"
                 value={sponsorForm.name}
                 onChange={(event) =>
@@ -1243,8 +1365,9 @@ export default function SponsorshipsDashboard() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editSponsorEmail">Email</Label>
-              <Input
+              <Label  htmlFor="editSponsorEmail">Email</Label>
+              <Input 
+              className = {`bg-background`}
                 id="editSponsorEmail"
                 type="email"
                 value={sponsorForm.email}
@@ -1254,8 +1377,9 @@ export default function SponsorshipsDashboard() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editSponsorPhone">Phone</Label>
-              <Input
+              <Label  htmlFor="editSponsorPhone">Phone</Label>
+              <Input 
+              className = {`bg-background`}
                 id="editSponsorPhone"
                 value={sponsorForm.phone}
                 onChange={(event) =>
@@ -1271,8 +1395,9 @@ export default function SponsorshipsDashboard() {
               ["zipCode", "Zip code"],
             ].map(([field, label]) => (
               <div className="space-y-2" key={field}>
-                <Label htmlFor={`editSponsor${field}`}>{label}</Label>
-                <Input
+                <Label  htmlFor={`editSponsor${field}`}>{label}</Label>
+                <Input 
+                className = {`bg-background`}
                   id={`editSponsor${field}`}
                   value={sponsorForm[field as keyof SponsorForm] as string}
                   onChange={(event) =>
@@ -1285,7 +1410,7 @@ export default function SponsorshipsDashboard() {
               </div>
             ))}
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="editSponsorBio">Bio</Label>
+              <Label  htmlFor="editSponsorBio">Bio</Label>
               <textarea
                 id="editSponsorBio"
                 value={sponsorForm.bio}
@@ -1502,7 +1627,7 @@ export default function SponsorshipsDashboard() {
 
                     <div className="space-y-4">
                       <div className="space-y-3">
-                        <Label htmlFor="recordStatus">Update status</Label>
+                        <Label  htmlFor="recordStatus">Update status</Label>
                         <Select
                           value={selectedRecord.status}
                           onValueChange={handleUpdateStatus}
@@ -1579,8 +1704,9 @@ export default function SponsorshipsDashboard() {
                     </div>
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="paymentAmount">Amount</Label>
-                        <Input
+                        <Label  htmlFor="paymentAmount">Amount</Label>
+                        <Input 
+                        className = {`bg-background`}
                           id="paymentAmount"
                           type="number"
                           value={paymentForm.amount}
@@ -1595,7 +1721,7 @@ export default function SponsorshipsDashboard() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="paymentMethod">Method</Label>
+                        <Label  htmlFor="paymentMethod">Method</Label>
                         <Select
                           value={paymentForm.method}
                           onValueChange={(value) =>
@@ -1616,8 +1742,9 @@ export default function SponsorshipsDashboard() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="paymentTxnId">Transaction ID</Label>
-                        <Input
+                        <Label  htmlFor="paymentTxnId">Transaction ID</Label>
+                        <Input 
+                        className = {`bg-background`}
                           id="paymentTxnId"
                           type="text"
                           value={paymentForm.txnId}
@@ -1631,8 +1758,9 @@ export default function SponsorshipsDashboard() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="paymentNote">Note</Label>
-                        <Input
+                        <Label  htmlFor="paymentNote">Note</Label>
+                        <Input 
+                        className = {`bg-background`}
                           id="paymentNote"
                           value={paymentForm.note}
                           placeholder="Gift update or memo"

@@ -6,6 +6,13 @@ import { useAuth } from "@/lib/auth-context";
 import type { Permission } from "@/lib/permissions";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/query-client";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 const sidebarItems = [
   {
@@ -59,7 +66,15 @@ const sidebarItems = [
   },
 ];
 
-export function DashboardSidebar() {
+type DashboardSidebarProps = {
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
+};
+
+export function DashboardSidebar({
+  mobileOpen,
+  onMobileOpenChange,
+}: DashboardSidebarProps) {
   const pathname = usePathname();
   const { can } = useAuth();
   const { data: unreadData } = useQuery<{ count: number }>({
@@ -75,8 +90,8 @@ export function DashboardSidebar() {
     can(item.permission as Permission),
   );
 
-  return (
-    <aside className="w-64 bg-card border-r border-border flex flex-col">
+  const navigation = (
+    <>
       {/* Logo */}
       <div className="p-6 border-b border-border">
         <Link
@@ -98,6 +113,7 @@ export function DashboardSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => onMobileOpenChange(false)}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                 isActive
                   ? "bg-primary text-primary-foreground font-medium"
@@ -122,6 +138,26 @@ export function DashboardSidebar() {
           © 2024 Seeds of Love Foundation
         </p>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <aside className="hidden w-64 flex-col border-r border-border bg-card lg:flex">
+        {navigation}
+      </aside>
+      <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
+        <SheetContent
+          side="left"
+          className="w-64 bg-card p-0 [&>button]:hidden"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>Dashboard navigation</SheetTitle>
+            <SheetDescription>Navigate through the dashboard.</SheetDescription>
+          </SheetHeader>
+          <div className="flex h-full flex-col">{navigation}</div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

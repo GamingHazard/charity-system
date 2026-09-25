@@ -35,6 +35,9 @@ import { url } from "inspector";
 import { apiRequest } from "@/lib/query-client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { ListPagination } from "@/components/dashboard/list-pagination";
+
+const PAGE_SIZE = 25;
 
 interface GalleryImage {
   _id: string;
@@ -68,11 +71,16 @@ export default function GalleryPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
+  const [page, setPage] = useState(1);
 
   const categoryOptions = ["Events", "Education", "Volunteers", "General"];
 
   const { data: galleryData, refetch } = useQuery<GalleryImage[]>({
-    queryKey: ["gallery", "all"],
+    queryKey: ["gallery", "all", page],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/gallery/all?page=${page}&limit=${PAGE_SIZE}`);
+      return response.json();
+    },
   });
 
   const [newImageForm, setNewImageForm] = useState({
@@ -332,6 +340,11 @@ export default function GalleryPage() {
         <h2 className="text-3xl font-bold text-foreground mb-2">
           Gallery Management
         </h2>
+        <ListPagination
+          page={page}
+          hasNextPage={images.length === PAGE_SIZE}
+          onPageChange={setPage}
+        />
         <p className="text-foreground/70">
           Manage gallery images and organize by category
         </p>

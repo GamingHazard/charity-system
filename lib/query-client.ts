@@ -1,16 +1,39 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import axios from "axios";
+import { getAccessToken, setAccessToken } from "@/lib/session-token";
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5454/api";
 
-const AUTH_TOKEN_KEY = "charity-admin-token";
-
 function getAuthHeaders() {
   if (typeof window === "undefined") return {};
 
-  const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
+  const token = getAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${BASE_URL}/auth/admin/refresh`, {
+      method: "POST",
+      credentials: "include",
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const data = await response.json();
+        const token = typeof data.token === "string" ? data.token : null;
+        setAccessToken(token);
+        return token;
+      })
+      .catch(() => null)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
 }
 
 // simple in-memory rate limit tracker (requests per window)
@@ -126,12 +149,24 @@ export async function apiRequest(
     body = JSON.stringify(data);
   }
 
-  const res = await fetch(`${BASE_URL}${url}`, {
+  let res = await fetch(`${BASE_URL}${url}`, {
     method,
     headers,
     body,
     credentials: "include",
   });
+
+  if (res.status === 401) {
+    const token = await refreshAccessToken();
+    if (token) {
+      res = await fetch(`${BASE_URL}${url}`, {
+        method,
+        headers: { ...headers, Authorization: `Bearer ${token}` },
+        body,
+        credentials: "include",
+      });
+    }
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -157,11 +192,21 @@ export const getQueryFn: <T>(options: {
     try {
       const url = `/${queryKey.join("/")}`;
 
-      const response = await axiosClient.get(url, {
-        signal: controller.signal,
-        withCredentials: true,
-        headers: getAuthHeaders(),
-      });
+      const request = () =>
+        axiosClient.get(url, {
+          signal: controller.signal,
+          withCredentials: true,
+          headers: getAuthHeaders(),
+        });
+      let response;
+      try {
+        response = await request();
+      } catch (error: any) {
+        if (error.response?.status !== 401) throw error;
+        const token = await refreshAccessToken();
+        if (!token) throw error;
+        response = await request();
+      }
 
       return response.data;
     } catch (error: any) {

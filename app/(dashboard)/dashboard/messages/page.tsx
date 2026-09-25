@@ -6,6 +6,9 @@ import { Eye, Mail, MailOpen, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { ListPagination } from "@/components/dashboard/list-pagination";
+
+const PAGE_SIZE = 25;
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -41,11 +44,12 @@ export default function MessagesPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const canManage = can("messages.manage");
+  const [page, setPage] = useState(1);
 
   const { data: messages = [], isLoading, isError } = useQuery<Message[]>({
-    queryKey: ["messages", "all"],
+    queryKey: ["messages", "all", page],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/messages/all");
+      const response = await apiRequest("GET", `/messages/all?page=${page}&limit=${PAGE_SIZE}`);
       return response.json();
     },
     refetchInterval: 10000,
@@ -119,6 +123,11 @@ export default function MessagesPage() {
           <div>
             <h2 className="text-3xl font-bold text-foreground">Messages</h2>
             <p className="mt-1 text-foreground/70">Read and manage contact enquiries.</p>
+            <ListPagination
+              page={page}
+              hasNextPage={messages.length === PAGE_SIZE}
+              onPageChange={setPage}
+            />
           </div>
         </div>
 

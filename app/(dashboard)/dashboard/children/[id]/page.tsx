@@ -1639,28 +1639,28 @@ export default function ChildDetailPage() {
             </h3>
             {sponsorProfile ? (
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg bg-muted p-4">
+                  <div className="min-w-0 rounded-lg bg-muted p-4">
                   <p className="text-xs uppercase tracking-wide text-foreground/60">
                     Sponsor
                   </p>
-                  <div className="mt-3 flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                    <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                       {sponsorProfile?.profile?.fullName
                         ?.charAt(0)
                         ?.toUpperCase() || "S"}
                     </div>
-                    <div>
-                      <p className="font-semibold text-foreground">
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words font-semibold text-foreground">
                         {sponsorProfile?.profile?.fullName}
                       </p>
-                      <p className="text-sm text-foreground/70">
+                        <p className="break-all text-sm text-foreground/70">
                         {sponsorProfile?.profile?.email}
                       </p>
                     </div>
                     <Button
                       variant="destructive"
                       size="sm"
-                      className="mt-4"
+                        className="w-full shrink-0 sm:mt-0 sm:w-auto"
                       onClick={() => {
                         setUnlinkError("");
                         setIsUnlinkDialogOpen(true);
@@ -1954,14 +1954,14 @@ export default function ChildDetailPage() {
                                     payment._id ||
                                     `${payment.transactionId || "payment"}-${paymentIndex}`
                                   }
-                                  className="grid gap-2 rounded-md bg-background p-3 text-sm sm:grid-cols-5"
+                                  className="grid gap-3 rounded-md bg-background p-3 text-sm sm:grid-cols-2 lg:grid-cols-5"
                                 >
-                                  <span>
+                                  <span className="break-words">
                                     {payment.date
                                       ? formatDisplayDate(payment.date)
                                       : "Not provided"}
                                   </span>
-                                  <span>
+                                  <span className="break-words">
                                     {Number(
                                       payment.amount || 0,
                                     ).toLocaleString()}{" "}

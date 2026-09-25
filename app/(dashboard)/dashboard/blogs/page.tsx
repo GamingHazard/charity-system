@@ -41,6 +41,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { url } from "inspector";
 import { toast } from "@/hooks/use-toast";
+import { ListPagination } from "@/components/dashboard/list-pagination";
+
+const PAGE_SIZE = 25;
 
 interface Comment {
   id: string;
@@ -86,13 +89,18 @@ export default function BlogsPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
+  const [page, setPage] = useState(1);
 
   const {
     data: blogData,
     isLoading,
     error,
   } = useQuery<any[]>({
-    queryKey: ["blogs", "all"],
+    queryKey: ["blogs", "all", page],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/blogs/all?page=${page}&limit=${PAGE_SIZE}`);
+      return response.json();
+    },
   });
 
   useEffect(() => {
@@ -386,6 +394,11 @@ export default function BlogsPage() {
         <h2 className="text-3xl font-bold text-foreground mb-2">
           Blog Management
         </h2>
+        <ListPagination
+          page={page}
+          hasNextPage={blogs.length === PAGE_SIZE}
+          onPageChange={setPage}
+        />
         <p className="text-foreground/70">
           Create, edit, and manage blog posts
         </p>

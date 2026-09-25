@@ -7,6 +7,7 @@ import {
   Permission,
   UserRole,
 } from "@/lib/permissions";
+import { getAccessToken, setAccessToken } from "@/lib/session-token";
 
 interface User {
   id: string;
@@ -25,15 +26,21 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const AUTH_TOKEN_KEY = "charity-admin-token";
-const AUTH_USER_KEY = "charity-admin-user";
-
 function getApiBaseUrl() {
   return process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5454/api";
 }
 
 function getAuthHeaders(token: string) {
   return { Authorization: `Bearer ${token}` };
+}
+
+async function refreshSession() {
+  const response = await fetch(`${getApiBaseUrl()}/auth/admin/refresh`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) return null;
+  return response.json();
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -43,23 +50,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
-        const savedUser = window.localStorage.getItem(AUTH_USER_KEY);
-        if (!token || !savedUser) return;
+        const data = await refreshSession();
+        if (!data?.token) return;
+        setAccessToken(data.token);
 
         const response = await fetch(`${getApiBaseUrl()}/auth/admin/me`, {
-          headers: getAuthHeaders(token),
+          headers: getAuthHeaders(data.token),
+          credentials: "include",
         });
         if (!response.ok) {
-          window.localStorage.removeItem(AUTH_TOKEN_KEY);
-          window.localStorage.removeItem(AUTH_USER_KEY);
+          setAccessToken(null);
           return;
         }
 
         const currentAdmin = await response.json();
         const restoredUser: User = {
           id: String(currentAdmin.id),
-          email: JSON.parse(savedUser).email,
+          email: currentAdmin.username,
           name: currentAdmin.username,
           role: normalizeRole(currentAdmin.role) as UserRole,
         };
@@ -77,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const response = await fetch(`${getApiBaseUrl()}/auth/admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ username: email, password }),
     });
     const data = await response.json();
@@ -91,25 +99,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: data.username,
       role,
     };
-    window.localStorage.setItem(AUTH_TOKEN_KEY, data.token);
-    window.localStorage.setItem(
-      AUTH_USER_KEY,
-      JSON.stringify(authenticatedUser),
-    );
+    setAccessToken(data.token);
     setUser(authenticatedUser);
   };
 
   const logout = () => {
     setUser(null);
-    const token = window.localStorage.getItem(AUTH_TOKEN_KEY);
-    window.localStorage.removeItem(AUTH_TOKEN_KEY);
-    window.localStorage.removeItem(AUTH_USER_KEY);
-    if (token) {
-      void fetch(`${getApiBaseUrl()}/auth/admin/logout`, {
+    const token = getAccessToken();
+    setAccessToken(null);
+    void (async () => {
+      const refreshedSession = await refreshSession();
+      const activeToken = refreshedSession?.token || token;
+      if (!activeToken) return;
+
+      await fetch(`${getApiBaseUrl()}/auth/admin/logout`, {
         method: "POST",
-        headers: getAuthHeaders(token),
+        headers: getAuthHeaders(activeToken),
+        credentials: "include",
       });
-    }
+    })();
   };
 
   return (

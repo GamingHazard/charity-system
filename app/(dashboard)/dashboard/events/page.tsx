@@ -36,6 +36,9 @@ import { set } from "react-hook-form";
 import { apiRequest } from "@/lib/query-client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { ListPagination } from "@/components/dashboard/list-pagination";
+
+const PAGE_SIZE = 25;
 
 interface Event {
   _id: string;
@@ -71,11 +74,16 @@ export default function EventsPage() {
   const [saving, setSaving] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [formError, setFormError] = useState("");
+  const [page, setPage] = useState(1);
 
   const categoryOptions = ["Community", "Education", "Volunteer", "General"];
 
   const { data: eventsData, isLoading } = useQuery<any[]>({
-    queryKey: ["events", "all"],
+    queryKey: ["events", "all", page],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/events/all?page=${page}&limit=${PAGE_SIZE}`);
+      return response.json();
+    },
   });
 
   useEffect(() => {
@@ -377,6 +385,11 @@ export default function EventsPage() {
         <h2 className="mb-2 text-2xl font-bold text-foreground sm:text-3xl">
           Events Management
         </h2>
+        <ListPagination
+          page={page}
+          hasNextPage={events.length === PAGE_SIZE}
+          onPageChange={setPage}
+        />
         <p className="text-foreground/70">
           Create, edit, and manage community events
         </p>

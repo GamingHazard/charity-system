@@ -1,0 +1,6 @@
+Centralized error handling and structured logging
+Mass-assignment fixes
+Secure signed uploads
+Payment transaction/idempotency safeguards
+Health/readiness endpoints and graceful shutdown
+Automated security and integration tests

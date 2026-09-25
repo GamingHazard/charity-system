@@ -48,6 +48,9 @@ import { toast } from "@/hooks/use-toast";
 import { ServerError } from "@/components/ui/server-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { jsPDF } from "jspdf";
+import { ListPagination } from "@/components/dashboard/list-pagination";
+
+const PAGE_SIZE = 25;
 
 const initialFormState: any = {
   _id: "",
@@ -348,17 +351,26 @@ function estimateGraduationYear(
 export default function ChildrenDashboard() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
 
   const {
     data: Profiles,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["children", "profiles"],
+    queryKey: ["children", "profiles", page],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/children/profiles?page=${page}&limit=${PAGE_SIZE}`);
+      return response.json();
+    },
   });
 
   const { data: sponsorRecords, isLoading: isLoadingSponsors } = useQuery({
-    queryKey: ["sponsors", "profiles", "all"],
+    queryKey: ["sponsors", "profiles", "all", page],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/sponsors/profiles/all?page=${page}&limit=${PAGE_SIZE}`);
+      return response.json();
+    },
   });
 
   const [children, setChildren] = useState<SponsorshipProfile[]>([]);
@@ -2374,7 +2386,7 @@ export default function ChildrenDashboard() {
   };
 
   return (
-    <div className="p-8 ">
+    <div className="min-w-0 p-4 sm:p-6 lg:p-8">
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">
@@ -2387,6 +2399,11 @@ export default function ChildrenDashboard() {
             Manage child profiles, edit sponsorship details, and keep a clean
             roster of supported children.
           </p>
+          <ListPagination
+            page={page}
+            hasNextPage={children.length === PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </div>
         <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
           <DropdownMenu>
@@ -2452,28 +2469,28 @@ export default function ChildrenDashboard() {
       </Card>
 
       {isLoading ? (
-        <div className="grid gap-6 bg-background rounded-lg lg:grid-cols-2">
+        <div className="grid min-w-0 grid-cols-1 gap-4 rounded-lg bg-background sm:grid-cols-2 sm:gap-6">
           {Array.from({ length: 4 }).map((_, index) => (
             <Card
               key={index}
-              className="overflow-hidden p-0 w-96 border-border bg-card"
+              className="w-full min-w-0 overflow-hidden border-border bg-card p-0"
             >
-              <Skeleton className="h-80 w-full rounded-none" />
+              <Skeleton className="h-64 w-full rounded-none sm:h-80" />
             </Card>
           ))}
         </div>
       ) : (
-        <div className="grid bg-background rounded-lg gap-6 lg:grid-cols-2">
+        <div className="grid min-w-0 grid-cols-1 gap-4 rounded-lg bg-background sm:grid-cols-2 sm:gap-6">
           {filteredChildren.map((child, index) => (
             <Card
               key={child._id || index}
-              className="overflow-hidden w-96 p-0 bg-card border-border transition-shadow hover:shadow-md"
+              className="w-full min-w-0 overflow-hidden border-border bg-card p-0 transition-shadow hover:shadow-md"
             >
-              <div className="relative h-80 overflow-hidden">
+              <div className="relative h-64 overflow-hidden sm:h-80">
                 <img
                   src={child.image?.url || "/no-staff.avif"}
                   alt={child.firstName || "Child profile"}
-                  className="h-full w-full object-fill transition-transform duration-300 hover:scale-105"
+                  className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
                 />
 
                 <div className="absolute inset-0 bg-linear-to-t from-black/85 via-black/20 to-transparent" />
@@ -2566,9 +2583,9 @@ export default function ChildrenDashboard() {
                 </div>
 
                 <div className="absolute inset-x-0 bottom-0 p-4">
-                  <div className="flex items-end justify-between gap-3">
-                    <div>
-                      <h2 className="text-xl font-semibold text-white">
+                  <div className="flex min-w-0 items-end justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="truncate text-xl font-semibold text-white">
                         {child.firstName} {child.secondName}
                       </h2>
                       <p className="text-sm text-white/80">
@@ -2576,7 +2593,7 @@ export default function ChildrenDashboard() {
                       </p>
                     </div>
 
-                    <div className="rounded-full bg-background/15 px-2 py-1 text-xs text-white/90 backdrop-blur-sm">
+                    <div className="max-w-[55%] truncate rounded-full bg-background/15 px-2 py-1 text-xs text-white/90 backdrop-blur-sm">
                       {getSponsorLabel(child)}
                     </div>
                   </div>

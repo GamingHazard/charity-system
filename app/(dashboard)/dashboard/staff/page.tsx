@@ -44,6 +44,9 @@ import { set } from "react-hook-form";
 import { url } from "inspector";
 import { apiRequest } from "@/lib/query-client";
 import { useQuery } from "@tanstack/react-query";
+import { ListPagination } from "@/components/dashboard/list-pagination";
+
+const PAGE_SIZE = 25;
 
 interface StaffMember {
   _id: string;
@@ -127,9 +130,14 @@ export default function StaffPage() {
     url: "",
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [page, setPage] = useState(1);
 
   const { data: staffData, refetch: refetchStaff } = useQuery<StaffMember[]>({
-    queryKey: ["staff", "all"],
+    queryKey: ["staff", "all", page],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/staff/all?page=${page}&limit=${PAGE_SIZE}`);
+      return response.json();
+    },
   });
 
   useEffect(() => {
@@ -351,6 +359,11 @@ export default function StaffPage() {
         <h2 className="text-3xl font-bold text-foreground mb-2">
           Staff & Volunteers Management
         </h2>
+        <ListPagination
+          page={page}
+          hasNextPage={staff.length === PAGE_SIZE}
+          onPageChange={setPage}
+        />
         <p className="text-foreground/70">
           Manage your team members and newsletter subscribers
         </p>
